@@ -1,8 +1,8 @@
-# Voice-Age: Predicting Biological Age from Voice
+# Sound of Aging: Predicting Biological Age from Voice
 
 Computational pipeline accompanying the manuscript:
 
-> **Voice-Age: Predicting Biological Age from Voice Using Deep Speech Embeddings**
+> **Sound of Aging: Large-Scale Evidence for a Voice-Based Biological Clock**
 > David Krongauz, Yanir Marmor et al.
 
 ---
