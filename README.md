@@ -185,7 +185,7 @@ the corresponding author.
 ```bibtex
 @article{krongauz2025voiceage,
   title   = {Voice-Age: Predicting Biological Age from Voice Using Deep Speech Embeddings},
-  author  = {Krongauz, David and others},
+  author  = {Krongauz, David et al.},
   year    = {2025},
 }
 ```
