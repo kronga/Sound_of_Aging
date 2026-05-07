@@ -50,6 +50,11 @@ from scipy.stats import pearsonr
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+try:
+    from sklearn.metrics import root_mean_squared_error as _rmse
+except ImportError:
+    def _rmse(y_true, y_pred):
+        return float(mean_squared_error(y_true, y_pred) ** 0.5)
 from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -263,7 +268,7 @@ def ridge_groupcv_with_exports(
         steps = []
         if not regress_out_confounds:
             if handle_nans == "impute":
-                steps.append(("imputer", SimpleImputer(strategy=impute_strategy)))
+                steps.append(("imputer", SimpleImputer(strategy=impute_strategy, keep_empty_features=True)))
             if standardize:
                 steps.append(("scaler", StandardScaler()))
         steps.append(("ridge", Ridge(alpha=a, random_state=random_state)))
@@ -319,14 +324,13 @@ def ridge_groupcv_with_exports(
                         "Pearson_r": float(pearsonr(y_va[gm], y_pred[gm])[0])
                         if np.std(y_pred[gm]) > 0 else float("nan"),
                         "MAE": float(mean_absolute_error(y_va[gm], y_pred[gm])),
-                        "RMSE": float(mean_squared_error(y_va[gm], y_pred[gm],
-                                                          squared=False)),
+                        "RMSE": float(_rmse(y_va[gm], y_pred[gm])),
                     })
 
     oof_r2 = r2_score(y, oof)
     oof_r = pearsonr(y, oof)[0] if np.std(oof) > 0 else float("nan")
     oof_mae = mean_absolute_error(y, oof)
-    oof_rmse = mean_squared_error(y, oof, squared=False)
+    oof_rmse = _rmse(y, oof)
 
     final_alpha = float(np.mean(fold_best_alphas)) if optimize_alpha and fold_best_alphas else alpha
     pipe_final = _make_pipe(final_alpha)
@@ -370,7 +374,7 @@ def ridge_groupcv_with_exports(
                     if np.std(oof[gm]) > 0 else float("nan"),
                     "oof_R2": float(r2_score(y[gm], oof[gm])),
                     "oof_MAE": float(mean_absolute_error(y[gm], oof[gm])),
-                    "oof_RMSE": float(mean_squared_error(y[gm], oof[gm], squared=False)),
+                    "oof_RMSE": float(_rmse(y[gm], oof[gm])),
                     "per_fold_metrics": fold_metrics_by_gender[gl],
                 }
         with open(os.path.join(output_dir, "metrics_by_gender.json"), "w") as f:
@@ -514,7 +518,7 @@ def run_multi_seed_ridge(
         "averaged_Pearson_r": float(pearsonr(y_true, y_pred)[0]) if np.std(y_pred) > 0 else float("nan"),
         "averaged_R2": float(r2_score(y_true, y_pred)),
         "averaged_MAE": float(mean_absolute_error(y_true, y_pred)),
-        "averaged_RMSE": float(mean_squared_error(y_true, y_pred, squared=False)),
+        "averaged_RMSE": float(_rmse(y_true, y_pred)),
     }
 
     # gender breakdown when split_gender_post_train was used
@@ -528,7 +532,7 @@ def run_multi_seed_ridge(
                 "R2": float(r2_score(yt, yp)),
                 "Pearson_r": float(pearsonr(yt, yp)[0]) if np.std(yp) > 0 else float("nan"),
                 "MAE": float(mean_absolute_error(yt, yp)),
-                "RMSE": float(mean_squared_error(yt, yp, squared=False)),
+                "RMSE": float(_rmse(yt, yp)),
                 "n_samples": int(len(sub)),
             }
         metrics["gender_metrics"] = gm_dict

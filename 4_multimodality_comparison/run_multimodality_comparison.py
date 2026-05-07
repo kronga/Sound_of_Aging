@@ -20,8 +20,8 @@ from lightgbm_regression import run_multi_seed_lightgbm
 # CONFIG — edit these paths before running
 # ============================================================
 
-DATA_DIR = "/path/to/age_prediction_data/"   # CSVs named X_<modality>_age.csv
-OUTPUT_BASE = "output/multimodality_lgbm"
+DATA_DIR = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
+OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_multimodality_lgbm"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 N_SPLITS = 5
 SPLIT_GENDER = True
@@ -53,6 +53,16 @@ def load_modality(name: str, features_csv: str) -> tuple[pd.DataFrame, list[str]
     df = pd.read_csv(os.path.join(DATA_DIR, features_csv), index_col=[0, 1])
     if "RegistrationCode" in df.columns:
         df = df.drop(columns=["RegistrationCode"])
+
+    # Merge age from the corresponding Y file if not already present
+    if "age" not in df.columns:
+        y_csv = features_csv.replace("X_", "Y_")
+        y_path = os.path.join(DATA_DIR, y_csv)
+        if os.path.exists(y_path):
+            y = pd.read_csv(y_path, index_col=[0, 1])
+            df = df.join(y[["age"]], how="inner")
+        else:
+            raise FileNotFoundError(f"Expected Y file not found: {y_path}")
 
     drop = MODALITY_DROP.get(name, [])
     df = df.drop(columns=[c for c in drop if c in df.columns])

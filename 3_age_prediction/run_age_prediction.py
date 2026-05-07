@@ -16,10 +16,10 @@ from ridge_regression import run_multi_seed_ridge
 # CONFIG — edit these paths before running
 # ============================================================
 
-WAVLM_FEATURES_CSV = "/path/to/WavLM_features.csv"         # (n_recordings × d) embeddings
-SUBJECT_DETAILS_CSV = "/path/to/subject_details_df.csv"     # must contain: age, gender, subject_number
+WAVLM_FEATURES_CSV = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/WavLM_features.csv"
+SUBJECT_DETAILS_CSV = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/subject_details_df_Oct25.csv"
 
-OUTPUT_DIR = "output/voice_age_ridge"
+OUTPUT_DIR = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step3_voice_age_ridge"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]            # 10 seeds for bagging
 
 # Ridge config

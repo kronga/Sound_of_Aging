@@ -38,7 +38,7 @@ BASE_PREDICTIONS_PATH = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFol
 COMBINED_RISK_FACTORS_PATH = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/combined_risk_factors.csv"
 
 # ---- Output ----
-OUTDIR = f"/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/volacno_plots/{MODALITY}/"
+OUTDIR = f"/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step5_volcano/{MODALITY}/"
 RUN_SUFFIX = ""
 
 # ---- Stratification ----
@@ -472,6 +472,10 @@ def main():
 
     # 2) Load combined risk factors (once)
     rf = pd.read_csv(COMBINED_RISK_FACTORS_PATH)
+
+    # Normalise subject identifier column name
+    if "subject_number" not in rf.columns and "subject_id" in rf.columns:
+        rf = rf.rename(columns={"subject_id": "subject_number"})
 
     needed_cols = ["subject_number", "research_stage"]
     miss = [c for c in needed_cols if c not in rf.columns]

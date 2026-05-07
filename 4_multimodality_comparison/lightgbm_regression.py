@@ -62,6 +62,11 @@ from scipy.stats import pearsonr, randint, uniform
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+try:
+    from sklearn.metrics import root_mean_squared_error as _rmse
+except ImportError:
+    def _rmse(y_true, y_pred):
+        return float(mean_squared_error(y_true, y_pred) ** 0.5)
 from sklearn.model_selection import GroupKFold, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 
@@ -342,13 +347,13 @@ def lightgbm_groupcv_with_exports(
                         "Pearson_r": float(pearsonr(y_va[gm], y_pred[gm])[0])
                         if np.std(y_pred[gm]) > 0 else float("nan"),
                         "MAE": float(mean_absolute_error(y_va[gm], y_pred[gm])),
-                        "RMSE": float(mean_squared_error(y_va[gm], y_pred[gm], squared=False)),
+                        "RMSE": float(_rmse(y_va[gm], y_pred[gm])),
                     })
 
     oof_r2 = r2_score(y, oof)
     oof_r = pearsonr(y, oof)[0] if np.std(oof) > 0 else float("nan")
     oof_mae = mean_absolute_error(y, oof)
-    oof_rmse = mean_squared_error(y, oof, squared=False)
+    oof_rmse = _rmse(y, oof)
 
     # final model
     if optimize_hyperparams and fold_best_params:
@@ -406,7 +411,7 @@ def lightgbm_groupcv_with_exports(
                     if np.std(oof[gm]) > 0 else float("nan"),
                     "oof_R2": float(r2_score(y[gm], oof[gm])),
                     "oof_MAE": float(mean_absolute_error(y[gm], oof[gm])),
-                    "oof_RMSE": float(mean_squared_error(y[gm], oof[gm], squared=False)),
+                    "oof_RMSE": float(_rmse(y[gm], oof[gm])),
                     "per_fold_metrics": fold_metrics_by_gender[gl],
                 }
         with open(os.path.join(output_dir, "metrics_by_gender.json"), "w") as f:
@@ -504,7 +509,7 @@ def run_multi_seed_lightgbm(
                     "Pearson_r": float(pearsonr(yt[mask], yp[mask])[0])
                     if np.std(yp[mask]) > 0 else float("nan"),
                     "MAE": float(mean_absolute_error(yt[mask], yp[mask])),
-                    "RMSE": float(mean_squared_error(yt[mask], yp[mask], squared=False)),
+                    "RMSE": float(_rmse(yt[mask], yp[mask])),
                 })
             imp_path = os.path.join(seed_dir, f"gender_{gender_label}", "feature_importance.csv")
             if os.path.exists(imp_path):
@@ -533,7 +538,7 @@ def run_multi_seed_lightgbm(
             "averaged_R2": float(r2_score(yt, yp)),
             "averaged_Pearson_r": float(pearsonr(yt, yp)[0]) if np.std(yp) > 0 else float("nan"),
             "averaged_MAE": float(mean_absolute_error(yt, yp)),
-            "averaged_RMSE": float(mean_squared_error(yt, yp, squared=False)),
+            "averaged_RMSE": float(_rmse(yt, yp)),
             "per_seed_R2_mean": float(sdf["R2"].mean()),
             "per_seed_R2_std": float(sdf["R2"].std()),
             "n_samples": int(len(yt)),
@@ -590,7 +595,7 @@ def run_multi_seed_lightgbm(
                         "Pearson_r": float(pearsonr(yt[m], yp[m])[0])
                         if np.std(yp[m]) > 0 else float("nan"),
                         "MAE": float(mean_absolute_error(yt[m], yp[m])),
-                        "RMSE": float(mean_squared_error(yt[m], yp[m], squared=False)),
+                        "RMSE": float(_rmse(yt[m], yp[m])),
                     })
                 imp_path = os.path.join(seed_dir, f"gender_{gender_label}",
                                         "feature_importance.csv")
@@ -622,7 +627,7 @@ def run_multi_seed_lightgbm(
                 "averaged_R2": float(r2_score(yt, yp)),
                 "averaged_Pearson_r": float(pearsonr(yt, yp)[0]) if np.std(yp) > 0 else float("nan"),
                 "averaged_MAE": float(mean_absolute_error(yt, yp)),
-                "averaged_RMSE": float(mean_squared_error(yt, yp, squared=False)),
+                "averaged_RMSE": float(_rmse(yt, yp)),
                 "per_seed_R2_mean": float(sdf["R2"].mean()),
                 "per_seed_R2_std": float(sdf["R2"].std()),
                 "n_samples": int(len(yt)),
@@ -665,7 +670,7 @@ def run_multi_seed_lightgbm(
                 "R2": float(r2_score(yt[m], yp[m])),
                 "Pearson_r": float(pearsonr(yt[m], yp[m])[0]) if np.std(yp[m]) > 0 else float("nan"),
                 "MAE": float(mean_absolute_error(yt[m], yp[m])),
-                "RMSE": float(mean_squared_error(yt[m], yp[m], squared=False)),
+                "RMSE": float(_rmse(yt[m], yp[m])),
             })
         ip = os.path.join(seed_dir, "feature_importance.csv")
         if os.path.exists(ip):
@@ -690,7 +695,7 @@ def run_multi_seed_lightgbm(
         "averaged_R2": float(r2_score(yt, yp)),
         "averaged_Pearson_r": float(pearsonr(yt, yp)[0]) if np.std(yp) > 0 else float("nan"),
         "averaged_MAE": float(mean_absolute_error(yt, yp)),
-        "averaged_RMSE": float(mean_squared_error(yt, yp, squared=False)),
+        "averaged_RMSE": float(_rmse(yt, yp)),
         "per_seed_R2_mean": float(sdf["R2"].mean()),
         "per_seed_R2_std": float(sdf["R2"].std()),
     }
@@ -705,7 +710,7 @@ def run_multi_seed_lightgbm(
                 "R2": float(r2_score(yt2, yp2)),
                 "Pearson_r": float(pearsonr(yt2, yp2)[0]) if np.std(yp2) > 0 else float("nan"),
                 "MAE": float(mean_absolute_error(yt2, yp2)),
-                "RMSE": float(mean_squared_error(yt2, yp2, squared=False)),
+                "RMSE": float(_rmse(yt2, yp2)),
                 "n_samples": int(len(sub)),
             }
         metrics["gender_metrics"] = gm_dict

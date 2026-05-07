@@ -359,7 +359,7 @@ if __name__ == "__main__":
     # Example usage
     ridge_root = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/Ridge_clean"
     lgbm_root = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/LGBM_stuff"
-    out = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/Ridge_clean"
+    out = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step6_visualization"
 
     # Set group_col to your ID column, for example: "subject_number" or "RegistrationCode"
     results = correlate_modalities_predictions(
