@@ -4,16 +4,22 @@ pandas>=2.2.2
 scikit-learn>=1.4.2
 scipy>=1.13.0
 lightgbm
+xgboost
 statsmodels
+optuna>=3.5.0
+pyarrow
 
 # Deep learning / embeddings
 torch>=2.2.2
 torchaudio>=2.3.0
 transformers>=4.39.3
 
-# Audio preprocessing
+# Audio preprocessing & classical acoustic features
 librosa>=0.10.2
 soundfile>=0.12.1
+pydub
+opensmile>=2.5.0
+praat-parselmouth>=0.4.7
 
 # Explainability
 shap

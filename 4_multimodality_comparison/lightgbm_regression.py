@@ -67,7 +67,7 @@ try:
 except ImportError:
     def _rmse(y_true, y_pred):
         return float(mean_squared_error(y_true, y_pred) ** 0.5)
-from sklearn.model_selection import GroupKFold, RandomizedSearchCV
+from sklearn.model_selection import GroupKFold, PredefinedSplit, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 
 import lightgbm as lgb
@@ -97,6 +97,7 @@ def lightgbm_groupcv_with_exports(
     optimize_hyperparams: bool = False,
     n_iter_search: int = 30,
     validation_fraction: float = 0.2,
+    n_jobs: int = -1,
 ) -> dict:
     """
     LightGBM regression with GroupKFold CV.
@@ -175,6 +176,7 @@ def lightgbm_groupcv_with_exports(
                 optimize_hyperparams=optimize_hyperparams,
                 n_iter_search=n_iter_search,
                 validation_fraction=validation_fraction,
+                n_jobs=n_jobs,
             )
             metrics_rows.append({"gender": gl, **m})
             results_by_gender[gl] = m
@@ -246,6 +248,13 @@ def lightgbm_groupcv_with_exports(
         if rs_series is not None:
             rs_series = rs_series.loc[mask]
     elif handle_nans == "impute":
+        all_nan_cols = X.columns[X.isna().all()].tolist()
+        if all_nan_cols:
+            X = X.drop(columns=all_nan_cols)
+            keep = [c for c in san_cols if c not in all_nan_cols]
+            orig_cols = [orig_cols[san_cols.index(c)] for c in keep]
+            san_cols = keep
+            rev_map = dict(zip(san_cols, orig_cols))
         imp = SimpleImputer(strategy=impute_strategy)
         X = pd.DataFrame(imp.fit_transform(X), index=X.index, columns=san_cols)
         if confounds is not None:
@@ -273,14 +282,15 @@ def lightgbm_groupcv_with_exports(
         lgbm_params = {
             "objective": "regression", "metric": "rmse",
             "boosting_type": "gbdt", "verbosity": -1,
-            "seed": random_state,
+            "seed": random_state, "num_threads": n_jobs,
         }
 
     gkf = GroupKFold(n_splits=n_splits)
     oof = pd.Series(index=y.index, dtype=float)
     fold_r2: list[float] = []
     importance_list: list[pd.DataFrame] = []
-    fold_best_params: list[dict] = []
+    # (val_r2, params) per fold — used to pick best for final model
+    fold_best_params: list[tuple[float, dict]] = []
     fold_metrics_by_gender: dict[str, list] = {"male": [], "female": []}
 
     for fold_idx, (tr_idx, va_idx) in enumerate(gkf.split(X, y, groups), start=1):
@@ -288,12 +298,18 @@ def lightgbm_groupcv_with_exports(
         y_tr, y_va = y.iloc[tr_idx], y.iloc[va_idx]
 
         if optimize_hyperparams:
+            # Split outer-train into inner_train (80%) and hpo_val (20%) by groups
             g_tr = groups.iloc[tr_idx]
             uniq = g_tr.unique()
             n_val = max(1, int(len(uniq) * validation_fraction))
             rng = np.random.RandomState(random_state + fold_idx)
             val_g = rng.choice(uniq, n_val, replace=False)
-            m_val = g_tr.isin(val_g)
+            m_val = g_tr.isin(val_g).values  # bool mask aligned to X_tr rows
+
+            # PredefinedSplit: -1 = always in train (inner_train), 0 = test (hpo_val)
+            test_fold = np.where(m_val, 0, -1)
+            ps = PredefinedSplit(test_fold)
+
             param_dists = {
                 "num_leaves": randint(20, 150), "max_depth": randint(3, 15),
                 "learning_rate": uniform(0.01, 0.2), "n_estimators": randint(100, 1000),
@@ -303,20 +319,22 @@ def lightgbm_groupcv_with_exports(
             }
             est = lgb.LGBMRegressor(objective="regression", metric="rmse",
                                     boosting_type="gbdt", verbosity=-1,
-                                    random_state=random_state)
+                                    random_state=random_state, n_jobs=n_jobs)
             rs = RandomizedSearchCV(est, param_dists, n_iter=n_iter_search,
-                                    scoring="r2", cv=3,
+                                    scoring="r2", cv=ps, n_jobs=1,
                                     random_state=random_state + fold_idx, verbose=0)
-            rs.fit(X_tr.loc[~m_val], y_tr.loc[~m_val])
-            bp = rs.best_params_
-            bp.update({"objective": "regression", "metric": "rmse",
-                       "boosting_type": "gbdt", "verbosity": -1, "seed": random_state})
-            fold_best_params.append(bp)
+            rs.fit(X_tr, y_tr)
+            bp = {**rs.best_params_,
+                  "objective": "regression", "metric": "rmse",
+                  "boosting_type": "gbdt", "verbosity": -1,
+                  "seed": random_state, "num_threads": n_jobs}
+            fold_best_params.append((rs.best_score_, bp))
             cur_params = bp
             print(f"Fold {fold_idx}: best val R²={rs.best_score_:.4f}")
         else:
             cur_params = lgbm_params.copy()
 
+        # Retrain on full outer train set with the chosen params, then predict test
         td = lgb.Dataset(X_tr, label=y_tr)
         if early_stopping_rounds:
             vd = lgb.Dataset(X_va, label=y_va, reference=td)
@@ -355,13 +373,9 @@ def lightgbm_groupcv_with_exports(
     oof_mae = mean_absolute_error(y, oof)
     oof_rmse = _rmse(y, oof)
 
-    # final model
+    # final model — use params from the fold with the highest inner val R²
     if optimize_hyperparams and fold_best_params:
-        fp: dict = {"objective": "regression", "metric": "rmse",
-                    "boosting_type": "gbdt", "verbosity": -1, "seed": random_state}
-        for k in fold_best_params[0]:
-            vals = [p[k] for p in fold_best_params]
-            fp[k] = int(np.mean(vals)) if isinstance(vals[0], (int, np.integer)) else float(np.mean(vals))
+        fp = max(fold_best_params, key=lambda t: t[0])[1]
     else:
         fp = lgbm_params
 

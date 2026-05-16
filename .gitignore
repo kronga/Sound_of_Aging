@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# HPC / cluster job artefacts (auto-generated SGE run.sh files)
+*/distribute_classical/
+*/distribute/
+*/distribute_classical_lgbm/
+*/distribute_voice_conditioned_hpo/

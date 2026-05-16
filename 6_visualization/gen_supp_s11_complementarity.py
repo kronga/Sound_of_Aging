@@ -1,0 +1,156 @@
+"""
+Supplementary Figure S11: Voice-modality complementarity dumbbell plot.
+Single panel, both sexes overlaid per row, ordered by female combined R².
+Width: 9 cm, font: 8 pt.
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+import os
+
+# ── paths ──────────────────────────────────────────────────────────────────
+CSV_PATH = (
+    "/home/davidkro/PycharmProjects/DeepVoice/"
+    "paper_revision_outputs/step4_voice_conditioned_hpo/"
+    "voice_conditioned_hpo_summary.csv"
+)
+OUT_DIR = (
+    "/home/davidkro/PycharmProjects/DeepVoice/"
+    "voice_age_manuscript/final_figs"
+)
+OUT_PNG = os.path.join(OUT_DIR, "supp_fig_S11_complementarity.png")
+OUT_PDF = os.path.join(OUT_DIR, "supp_fig_S11_complementarity.pdf")
+
+MODALITY_LABELS = {
+    "metabolomics": "Metabolomics",
+    "NMR": "NMR",
+    "sleep": "Sleep",
+    "DEXA": "DEXA",
+    "diet": "Diet",
+    "lifestyle": "Lifestyle",
+    "microbiome": "Microbiome",
+    "retina": "Retina",
+}
+
+GRAY         = "#888888"
+FEMALE_COLOR = "#E07070"
+MALE_COLOR   = "#4A7FB5"
+OFFSET       = 0.22   # female above centre, male below
+ROW_STEP     = 1.2    # vertical distance between modality centres
+FONT         = 8
+FIGW         = 9 / 2.54   # 9 cm → inches
+
+# ── load & sort by female combined R² ascending (best at top in barh) ──────
+df = pd.read_csv(CSV_PATH)
+df["modality_label"] = df["modality"].map(MODALITY_LABELS)
+
+female_sorted = (
+    df[df["sex"] == "female"]
+    .sort_values("conditioned_R2_mean", ascending=True)["modality"]
+    .tolist()
+)
+n = len(female_sorted)
+y_centers = {mod: i * ROW_STEP for i, mod in enumerate(female_sorted)}
+
+# ── figure setup ────────────────────────────────────────────────────────────
+FIGH = (n * ROW_STEP + 1.4) / 2.54   # auto height in inches
+plt.rcParams.update({
+    "font.size":         FONT,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "font.family":       "sans-serif",
+})
+fig, ax = plt.subplots(figsize=(FIGW, FIGH))
+
+# ── alternating row backgrounds ─────────────────────────────────────────────
+for i, mod in enumerate(female_sorted):
+    if i % 2 == 0:
+        yc = y_centers[mod]
+        ax.axhspan(yc - ROW_STEP / 2, yc + ROW_STEP / 2,
+                   color="#F0F0F0", zorder=0)
+
+# ── draw dumbbells ──────────────────────────────────────────────────────────
+for mod in female_sorted:
+    yc = y_centers[mod]
+    for sex, color, sign in [("female", FEMALE_COLOR, +1), ("male", MALE_COLOR, -1)]:
+        rows = df[(df["modality"] == mod) & (df["sex"] == sex)]
+        if rows.empty:
+            continue
+        row   = rows.iloc[0]
+        base  = row["baseline_R2_mean"]
+        voice = row["voice_R2_mean"]
+        comb  = row["conditioned_R2_mean"]
+        ci    = row["conditioned_R2_std"] * 1.96
+        y     = yc + sign * OFFSET
+
+        # thin grey connector
+        ax.plot([min(base, voice, comb), comb], [y, y],
+                color=GRAY, lw=0.6, zorder=1)
+
+        # coloured gain segment: max(base,voice) → comb
+        ax.plot([max(base, voice), comb], [y, y],
+                color=color, lw=2.5, solid_capstyle="butt", zorder=2)
+
+        # baseline square (grey)
+        ax.scatter(base, y, marker="s", s=20, color=GRAY,
+                   zorder=3, linewidths=0.4, edgecolors="white")
+
+        # voice diamond (open, sex colour)
+        ax.scatter(voice, y, marker="D", s=18, color="white",
+                   zorder=3, linewidths=0.9, edgecolors=color)
+
+        # combined circle + CI
+        ax.errorbar(comb, y, xerr=ci, fmt="o", ms=4.5,
+                    color=color, ecolor=color, elinewidth=0.8,
+                    capsize=2, capthick=0.8, zorder=4)
+
+# ── axes formatting ─────────────────────────────────────────────────────────
+y_tick_vals   = [y_centers[m] for m in female_sorted]
+y_tick_labels = [MODALITY_LABELS[m] for m in female_sorted]
+ax.set_yticks(y_tick_vals)
+ax.set_yticklabels(y_tick_labels, fontsize=FONT)
+ax.set_ylim(-ROW_STEP * 0.6, (n - 1) * ROW_STEP + ROW_STEP * 0.6)
+ax.set_xlim(0.0, 0.78)
+ax.set_xlabel("Out-of-fold R²", fontsize=FONT)
+ax.set_xticks(np.arange(0.0, 0.79, 0.1))
+ax.set_xticklabels([f"{v:.1f}" for v in np.arange(0.0, 0.79, 0.1)])
+ax.tick_params(axis="x", labelsize=FONT, rotation=45)
+ax.xaxis.grid(True, color="#DDDDDD", linewidth=0.6)
+ax.yaxis.grid(False)
+ax.set_axisbelow(True)
+
+# ── legend ──────────────────────────────────────────────────────────────────
+legend_elements = [
+    mlines.Line2D([0], [0], marker="s", color="w", markerfacecolor=GRAY,
+                  markeredgecolor=GRAY, markersize=5, label="Baseline"),
+    mlines.Line2D([0], [0], marker="D", color="w", markerfacecolor="white",
+                  markeredgecolor=GRAY, markersize=5, label="Voice only"),
+    mlines.Line2D([0], [0], marker="o", color="w", markerfacecolor=GRAY,
+                  markeredgecolor=GRAY, markersize=5, label="Combined"),
+    mlines.Line2D([0], [0], color=FEMALE_COLOR, lw=2.5, label="Female gain"),
+    mlines.Line2D([0], [0], color=MALE_COLOR,   lw=2.5, label="Male gain"),
+]
+plt.tight_layout()
+os.makedirs(OUT_DIR, exist_ok=True)
+
+# ── save plot without legend ─────────────────────────────────────────────────
+fig.savefig(OUT_PNG, dpi=300, bbox_inches="tight")
+fig.savefig(OUT_PDF, bbox_inches="tight")
+print(f"Saved:\n  {OUT_PNG}\n  {OUT_PDF}")
+
+# ── save legend as separate figure ──────────────────────────────────────────
+fig_leg, ax_leg = plt.subplots(figsize=(2.2, 1.6))
+ax_leg.axis("off")
+leg = ax_leg.legend(handles=legend_elements, fontsize=FONT, ncol=1,
+                    loc="center", frameon=True, framealpha=0.9,
+                    handlelength=1.6, borderpad=0.8)
+fig_leg.tight_layout()
+leg_png = os.path.join(OUT_DIR, "supp_fig_S11_complementarity_legend.png")
+leg_pdf = os.path.join(OUT_DIR, "supp_fig_S11_complementarity_legend.pdf")
+fig_leg.savefig(leg_png, dpi=300, bbox_inches="tight")
+fig_leg.savefig(leg_pdf, bbox_inches="tight")
+print(f"  {leg_png}\n  {leg_pdf}")
