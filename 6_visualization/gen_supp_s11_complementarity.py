@@ -15,8 +15,8 @@ import os
 # ── paths ──────────────────────────────────────────────────────────────────
 CSV_PATH = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
-    "paper_revision_outputs/step4_voice_conditioned_hpo/"
-    "voice_conditioned_hpo_summary.csv"
+    "paper_revision_outputs/step4_voice_conditioned_holdout_fullpool_oof_cal/"
+    "voice_conditioned_holdout_oof_fullpool_cal_summary.csv"
 )
 OUT_DIR = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
@@ -24,12 +24,15 @@ OUT_DIR = (
 )
 OUT_PNG = os.path.join(OUT_DIR, "supp_fig_S11_complementarity.png")
 OUT_PDF = os.path.join(OUT_DIR, "supp_fig_S11_complementarity.pdf")
+# fig3b is the same plot under a different name
+FIG3B_PNG = os.path.join(OUT_DIR, "fig3b_gain_performance.png")
+FIG3B_PDF = os.path.join(OUT_DIR, "fig3b_gain_performance.pdf")
 
 MODALITY_LABELS = {
     "metabolomics": "Metabolomics",
     "NMR": "NMR",
     "sleep": "Sleep",
-    "DEXA": "DEXA",
+    "DEXA": "DXA",
     "diet": "Diet",
     "lifestyle": "Lifestyle",
     "microbiome": "Microbiome",
@@ -44,13 +47,17 @@ ROW_STEP     = 1.2    # vertical distance between modality centres
 FONT         = 8
 FIGW         = 9 / 2.54   # 9 cm → inches
 
-# ── load & sort by female combined R² ascending (best at top in barh) ──────
+# ── load & sort by female conditioning gain ascending (best at top in barh) ─
 df = pd.read_csv(CSV_PATH)
+df = df.rename(columns={
+    "cond_R2_mean": "conditioned_R2_mean",
+    "cond_R2_std": "conditioned_R2_std",
+})
 df["modality_label"] = df["modality"].map(MODALITY_LABELS)
 
 female_sorted = (
     df[df["sex"] == "female"]
-    .sort_values("conditioned_R2_mean", ascending=True)["modality"]
+    .sort_values("delta_R2_mean", ascending=True)["modality"]
     .tolist()
 )
 n = len(female_sorted)
@@ -115,7 +122,7 @@ ax.set_yticks(y_tick_vals)
 ax.set_yticklabels(y_tick_labels, fontsize=FONT)
 ax.set_ylim(-ROW_STEP * 0.6, (n - 1) * ROW_STEP + ROW_STEP * 0.6)
 ax.set_xlim(0.0, 0.78)
-ax.set_xlabel("Out-of-fold R²", fontsize=FONT)
+ax.set_xlabel("Held-out test-set R²", fontsize=FONT)
 ax.set_xticks(np.arange(0.0, 0.79, 0.1))
 ax.set_xticklabels([f"{v:.1f}" for v in np.arange(0.0, 0.79, 0.1)])
 ax.tick_params(axis="x", labelsize=FONT, rotation=45)
@@ -140,7 +147,9 @@ os.makedirs(OUT_DIR, exist_ok=True)
 # ── save plot without legend ─────────────────────────────────────────────────
 fig.savefig(OUT_PNG, dpi=300, bbox_inches="tight")
 fig.savefig(OUT_PDF, bbox_inches="tight")
-print(f"Saved:\n  {OUT_PNG}\n  {OUT_PDF}")
+fig.savefig(FIG3B_PNG, dpi=300, bbox_inches="tight")
+fig.savefig(FIG3B_PDF, bbox_inches="tight")
+print(f"Saved:\n  {OUT_PNG}\n  {OUT_PDF}\n  {FIG3B_PNG}\n  {FIG3B_PDF}")
 
 # ── save legend as separate figure ──────────────────────────────────────────
 fig_leg, ax_leg = plt.subplots(figsize=(2.2, 1.6))
@@ -151,6 +160,10 @@ leg = ax_leg.legend(handles=legend_elements, fontsize=FONT, ncol=1,
 fig_leg.tight_layout()
 leg_png = os.path.join(OUT_DIR, "supp_fig_S11_complementarity_legend.png")
 leg_pdf = os.path.join(OUT_DIR, "supp_fig_S11_complementarity_legend.pdf")
+fig3b_leg_png = os.path.join(OUT_DIR, "fig3b_gain_performance_legend.png")
+fig3b_leg_pdf = os.path.join(OUT_DIR, "fig3b_gain_performance_legend.pdf")
 fig_leg.savefig(leg_png, dpi=300, bbox_inches="tight")
 fig_leg.savefig(leg_pdf, bbox_inches="tight")
-print(f"  {leg_png}\n  {leg_pdf}")
+fig_leg.savefig(fig3b_leg_png, dpi=300, bbox_inches="tight")
+fig_leg.savefig(fig3b_leg_pdf, bbox_inches="tight")
+print(f"  {leg_png}\n  {leg_pdf}\n  {fig3b_leg_png}\n  {fig3b_leg_pdf}")
