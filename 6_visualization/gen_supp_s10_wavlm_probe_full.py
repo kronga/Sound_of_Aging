@@ -1,10 +1,10 @@
 """
-Generate supplementary WavLM probe figure (Supp Fig S10).
+Generate supplementary WavLM probe figure (Supp Fig S6).
 
 All 56 acoustic features (Praat HNR excluded), female/male bars,
-colour-coded by category, legend at upper right.
+colour-coded by category, split into two side-by-side feature panels.
 
-Output: voice_age_manuscript/final_figs/supp_fig_S10_wavlm_probe_gender.pdf/.png
+Output: voice_age_manuscript/final_figs/supp_fig_S6_wavlm_probe_gender.pdf/.png
 """
 from __future__ import annotations
 
@@ -58,13 +58,6 @@ def select_all_features(df: pd.DataFrame) -> pd.DataFrame:
 def plot(df: pd.DataFrame) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    labels    = df["label"].tolist()
-    r2_female = df["r2_female"].tolist()
-    r2_male   = df["r2_male"].tolist()
-    cats      = df["category"].tolist()
-
-    n      = len(labels)
-    y_pos  = np.arange(n)
     bar_h  = 0.35
 
     FONT = 7
@@ -74,45 +67,64 @@ def plot(df: pd.DataFrame) -> None:
         "axes.spines.right":False,
     })
 
-    fig_height = max(8.0, n * 0.32 + 1.5)
-    fig, ax = plt.subplots(figsize=(6.0, fig_height))
-
-    bar_colors = [CATEGORY_COLORS.get(c, "#aaaaaa") for c in cats]
-
-    ax.barh(
-        y_pos + bar_h / 2, r2_female, bar_h,
-        color=bar_colors, alpha=0.85, label="Female",
-        edgecolor="white", linewidth=0.3,
-    )
-    ax.barh(
-        y_pos - bar_h / 2, r2_male, bar_h,
-        color=bar_colors, alpha=0.45, hatch="///", label="Male",
-        edgecolor="white", linewidth=0.3,
+    # Preserve the original top-to-bottom order while cutting the long list in half.
+    split_idx = int(np.ceil(len(df) / 2))
+    panels = [df.iloc[:split_idx].copy(), df.iloc[split_idx:].copy()]
+    max_panel_n = max(len(panel) for panel in panels)
+    fig_height = max(8.0, max_panel_n * 0.34 + 1.2)
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(10.8, fig_height),
+        sharex=True,
+        gridspec_kw={"wspace": 0.62},
     )
 
-    for i, (rf, rm) in enumerate(zip(r2_female, r2_male)):
-        if np.isfinite(rf):
-            ax.text(rf + 0.004, y_pos[i] + bar_h / 2,
-                    f"{rf:.2f}", va="center", ha="left", fontsize=5)
-        if np.isfinite(rm):
-            ax.text(rm + 0.004, y_pos[i] - bar_h / 2,
-                    f"{rm:.2f}", va="center", ha="left", fontsize=5)
+    for ax, panel in zip(axes, panels):
+        labels    = panel["label"].tolist()
+        r2_female = panel["r2_female"].tolist()
+        r2_male   = panel["r2_male"].tolist()
+        cats      = panel["category"].tolist()
 
-    prev_cat = None
-    for i, cat in enumerate(cats):
-        if cat != prev_cat and i > 0:
-            ax.axhline(i - 0.5, color="grey", linewidth=0.5, linestyle="--", alpha=0.6)
-        prev_cat = cat
+        n     = len(labels)
+        y_pos = np.arange(n)
+        bar_colors = [CATEGORY_COLORS.get(c, "#aaaaaa") for c in cats]
 
-    for i in range(n):
-        ax.axhspan(i - 0.5, i + 0.5,
-                   color="#f7f7f7" if i % 2 == 0 else "white", zorder=0)
+        for i in range(n):
+            ax.axhspan(i - 0.5, i + 0.5,
+                       color="#f7f7f7" if i % 2 == 0 else "white", zorder=0)
 
-    ax.axvline(0, color="black", linewidth=0.6)
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=FONT)
-    ax.set_xlim(left=-0.05, right=1.10)
-    ax.set_xlabel("Out-of-fold R²", fontsize=FONT)
+        ax.barh(
+            y_pos + bar_h / 2, r2_female, bar_h,
+            color=bar_colors, alpha=0.85, label="Female",
+            edgecolor="white", linewidth=0.3,
+        )
+        ax.barh(
+            y_pos - bar_h / 2, r2_male, bar_h,
+            color=bar_colors, alpha=0.45, hatch="///", label="Male",
+            edgecolor="white", linewidth=0.3,
+        )
+
+        for i, (rf, rm) in enumerate(zip(r2_female, r2_male)):
+            if np.isfinite(rf):
+                ax.text(rf + 0.004, y_pos[i] + bar_h / 2,
+                        f"{rf:.2f}", va="center", ha="left", fontsize=5)
+            if np.isfinite(rm):
+                ax.text(rm + 0.004, y_pos[i] - bar_h / 2,
+                        f"{rm:.2f}", va="center", ha="left", fontsize=5)
+
+        prev_cat = None
+        for i, cat in enumerate(cats):
+            if cat != prev_cat and i > 0:
+                ax.axhline(i - 0.5, color="grey", linewidth=0.5, linestyle="--", alpha=0.6)
+            prev_cat = cat
+
+        ax.axvline(0, color="black", linewidth=0.6)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=FONT)
+        ax.set_ylim(-0.5, n - 0.5)
+        ax.invert_yaxis()
+        ax.set_xlim(left=-0.05, right=1.10)
+        ax.set_xlabel("Out-of-fold R²", fontsize=FONT)
 
     cat_patches = [
         mpatches.Patch(facecolor=CATEGORY_COLORS[c], label=c)
@@ -123,26 +135,27 @@ def plot(df: pd.DataFrame) -> None:
         mpatches.Patch(facecolor="#888888", alpha=0.45, hatch="///", label="Male"),
     ]
 
-    leg1 = ax.legend(
+    leg1 = axes[1].legend(
         handles=sex_legend,
-        fontsize=FONT - 1, loc="upper right",
+        fontsize=FONT - 1, loc="upper left", bbox_to_anchor=(1.02, 1.0),
         frameon=True, framealpha=0.9,
         title="Sex", title_fontsize=FONT - 1,
+        borderaxespad=0,
     )
-    ax.add_artist(leg1)
-    ax.legend(
+    axes[1].add_artist(leg1)
+    axes[1].legend(
         handles=cat_patches,
         fontsize=FONT - 1.5,
-        loc="upper left", bbox_to_anchor=(1.02, 1.0),
+        loc="upper left", bbox_to_anchor=(1.02, 0.86),
         frameon=True, framealpha=0.9,
         title="Category", title_fontsize=FONT - 1,
         ncol=1,
         borderaxespad=0,
     )
 
-    plt.tight_layout()
+    fig.subplots_adjust(left=0.11, right=0.82, top=0.98, bottom=0.08, wspace=0.62)
     for ext in (".pdf", ".png"):
-        out = OUT_DIR / f"supp_fig_S10_wavlm_probe_gender{ext}"
+        out = OUT_DIR / f"supp_fig_S6_wavlm_probe_gender{ext}"
         fig.savefig(out, dpi=300 if ext == ".png" else None, bbox_inches="tight")
         print(f"Saved → {out}")
     plt.close(fig)

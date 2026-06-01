@@ -262,7 +262,12 @@ def plot_lollipop_combined(
     group_counts: dict[str, tuple[int, int]],
 ):
     FONT = 8
-    FIG_WIDTH = 6.30
+    FEATURE_FONT = 9
+    TICK_FONT = 9
+    AXIS_LABEL_FONT = 10
+    TITLE_FONT = 10.5
+    Y_EDGE_PAD = 0.30
+    FIG_WIDTH = 7.00
     plt.rcParams.update({"font.size": FONT})
 
     male_sdf   = summary["male"]
@@ -278,7 +283,12 @@ def plot_lollipop_combined(
 
     line_height_inch = FONT / 72 * 1.5
     fig_height = max(6, n_feat * line_height_inch + 1.5)
-    fig, axes = plt.subplots(1, 2, sharey=True, figsize=(FIG_WIDTH, fig_height))
+    fig, axes = plt.subplots(
+        1, 2,
+        sharey=True,
+        figsize=(FIG_WIDTH, fig_height),
+        gridspec_kw={"wspace": 0.18},
+    )
     sns.set_style("whitegrid")
 
     for gender, ax in [("female", axes[0]), ("male", axes[1])]:
@@ -310,34 +320,50 @@ def plot_lollipop_combined(
                        edgecolors=[edges[i] for i in np.where(mask & valid)[0]],
                        linewidths=0.4, zorder=5)
         ax.axvline(0, color="dimgrey", lw=0.5, ls="--", zorder=2)
-        ax.set_xlabel(r"$\Delta$SD (mean $\pm$ 95% CI)", fontsize=FONT)
+        ax.set_xlabel(r"$\Delta$SD (mean $\pm$ 95% CI)", fontsize=AXIS_LABEL_FONT)
         bottom_n, top_n = group_counts.get(gender, ("?", "?"))
         ax.set_title(f"{gender.capitalize()}  (n={bottom_n}/{top_n})",
-                     fontsize=FONT, weight="bold")
-        ax.tick_params(axis="both", labelsize=FONT)
+                     fontsize=TITLE_FONT, weight="bold")
+        ax.tick_params(axis="both", labelsize=TICK_FONT)
+        ax.set_ylim(-Y_EDGE_PAD, n_feat - 1 + Y_EDGE_PAD)
 
     axes[0].set_yticks(y_pos)
-    axes[0].set_yticklabels(display_labels, fontsize=FONT)
+    axes[0].set_yticklabels(display_labels, fontsize=FEATURE_FONT, fontweight="bold")
     axes[0].tick_params(axis="y", length=0)
 
-    fig.legend(handles=[
+    legend_handles = [
         Line2D([0],[0], marker='o', color='w', markerfacecolor='#FF5252',
                markeredgecolor='black', markersize=4, label='Higher in old-predicted (sig.)'),
         Line2D([0],[0], marker='o', color='w', markerfacecolor='#4CAF50',
                markeredgecolor='black', markersize=4, label='Lower in old-predicted (sig.)'),
         Line2D([0],[0], marker='o', color='w', markerfacecolor='grey',
                markersize=3.5, label='Not significant'),
-    ], fontsize=FONT, frameon=True, loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.0))
+    ]
 
-    plt.tight_layout(rect=[0, 0.05, 1, 1])
+    plt.tight_layout(w_pad=2.0, pad=0.15)
     os.makedirs(OUTDIR, exist_ok=True)
     out_prefix = os.path.join(OUTDIR, f"lollipop_combined_p{percent}_")
     plt.savefig(out_prefix + ".png", dpi=300, bbox_inches="tight")
     plt.savefig(out_prefix + ".pdf", bbox_inches="tight")
-
     plt.close()
+
+    legend_fig = plt.figure(figsize=(2.6, 0.95))
+    legend = legend_fig.legend(
+        handles=legend_handles,
+        fontsize=FONT,
+        frameon=True,
+        loc="center",
+        ncol=1,
+    )
+    legend.get_frame().set_edgecolor("lightgrey")
+    legend.get_frame().set_linewidth(0.8)
+    legend_fig.savefig(out_prefix + "legend.png", dpi=300, bbox_inches="tight")
+    legend_fig.savefig(out_prefix + "legend.pdf", bbox_inches="tight")
+    plt.close(legend_fig)
+
     plt.rcParams.update({"font.size": plt.rcParamsDefault["font.size"]})
     print(f"Saved combined lollipop → {out_prefix}.png/.pdf")
+    print(f"Saved lollipop legend → {out_prefix}legend.png/.pdf")
 
 
 def main():
