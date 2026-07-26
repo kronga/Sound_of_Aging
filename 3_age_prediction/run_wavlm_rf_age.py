@@ -36,10 +36,10 @@ BASE = Path("/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_vo
 WAVLM_FILTERED_CSV = BASE / "WavLM_features_filtered_with_RF.csv"
 SUBJECT_CSV        = BASE / "subject_details_df_Oct25.csv"
 
-OUTPUT_BASE  = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_wavlm_rf"
-RF_CLASS_DIR = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_rf"
-RIDGE_CLASS  = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_ridge"
-RIDGE_WAVLM  = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_voice_age_ridge"
+OUTPUT_BASE  = Path(__file__).parents[2] / "analysis_outputs" / "step3_wavlm_rf"
+RF_CLASS_DIR = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_rf"
+RIDGE_CLASS  = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_ridge"
+RIDGE_WAVLM  = Path(__file__).parents[2] / "analysis_outputs" / "step3_voice_age_ridge"
 
 MIN_AGE, MAX_AGE = 40, 70
 N_ITER_SEARCH    = 30

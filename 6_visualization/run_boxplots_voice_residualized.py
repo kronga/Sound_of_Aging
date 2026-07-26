@@ -21,6 +21,8 @@ from scipy.stats import linregress, mannwhitneyu
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "5_downstream_analysis"))
 import volcano_visualization as vv
 
+from phenotype_enrichment import VAT_AREA_COLUMN, add_vat_area
+
 OUT_TAG = os.environ.get("VOICE_RESID_OUT_TAG", "").strip()
 STEP3_DIR = os.environ.get("VOICE_STEP3_DIR", "step3_voice_age_ridge").strip()
 
@@ -30,13 +32,13 @@ def tagged_name(name: str) -> str:
 
 
 OUTDIR = os.path.join(
-    "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step5_volcano",
+    "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step5_volcano",
     tagged_name("voice_residualized"),
     "boxplots",
 )
 AVERAGED_PRED_BASE = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
-    f"paper_revision_outputs/{STEP3_DIR}/"
+    f"analysis_outputs/{STEP3_DIR}/"
     "gender_{gender}/predictions_averaged.csv"
 )
 SUBJECT_DETAILS_CSV = (
@@ -44,7 +46,7 @@ SUBJECT_DETAILS_CSV = (
     "Oct25_voice_full_length/subject_details_df_Oct25.csv"
 )
 GENDERS = ["female", "male"]
-MIN_AGE, MAX_AGE = 40, 72
+MIN_AGE, MAX_AGE = 40, 70
 PERCENTILE = 0.25
 
 
@@ -53,13 +55,21 @@ class PlotSpec:
     column_name: str
     output_stub: str
     ylabel: str
-    threshold: float | None = None
+    threshold: float | dict[str, float] | None = None
+    scale: float = 1.0
+
+    def threshold_for(self, gender: str) -> float | None:
+        if isinstance(self.threshold, dict):
+            return self.threshold.get(gender)
+        return self.threshold
 
 
 PLOT_SPECS = [
     # Adiposity
     PlotSpec("BMI", "bmi", "BMI (kg/m²)", 30),
-    PlotSpec("Scanned VAT mass (DXA)", "vat_mass", "Visceral Adipose Tissue (kg)", None),
+    PlotSpec("Waist circumference", "waist", "Waist circumference (cm)",
+             {"female": 88, "male": 102}),
+    PlotSpec(VAT_AREA_COLUMN, "vat_area", "VAT area (cm²)", None),
     # Sleep
     PlotSpec("AHI (SM)", "ahi", "AHI (events/hour)", 15),
     PlotSpec("Snore DB", "snore_db", "Snore Intensity (dB)", None),
@@ -70,8 +80,8 @@ PLOT_SPECS = [
     PlotSpec("Liver viscosity (US)", "liver_viscosity", "Liver viscosity (kPa)", 2.0),
     PlotSpec("Carotid - intima media thickness (US)", "carotid_imt", "Carotid IMT (mm)", 0.9),
     # Functional capacity (higher in younger-sounding)
-    PlotSpec("Hand Grip Left", "hand_grip_left", "Hand Grip Left (kg)", None),
-    PlotSpec("Hand Grip Right", "hand_grip_right", "Hand Grip Right (kg)", None),
+    PlotSpec("Hand Grip Left", "hand_grip_left", "Hand Grip Left (kg)", None, scale=1/2.205),
+    PlotSpec("Hand Grip Right", "hand_grip_right", "Hand Grip Right (kg)", None, scale=1/2.205),
     PlotSpec("Albumin (BT)", "albumin", "Albumin (g/dL)", 3.5),
 ]
 
@@ -87,7 +97,7 @@ def _stage_rank(stage: str) -> tuple[int, str]:
 
 
 def load_rf() -> pd.DataFrame:
-    rf = pd.read_csv(vv.COMBINED_RISK_FACTORS_PATH)
+    rf = add_vat_area(pd.read_csv(vv.COMBINED_RISK_FACTORS_PATH))
     if "subject_number" not in rf.columns and "subject_id" in rf.columns:
         rf = rf.rename(columns={"subject_id": "subject_number"})
     rf = rf.copy()
@@ -101,11 +111,14 @@ def load_rf() -> pd.DataFrame:
 
 
 def load_residualized_groups(gender: str) -> tuple[pd.DataFrame, list[str], list[str]]:
-    sd = pd.read_csv(SUBJECT_DETAILS_CSV, usecols=["filename", "visit_number"])
-    sd = sd.rename(columns={"visit_number": "research_stage"})
     pred = pd.read_csv(AVERAGED_PRED_BASE.format(gender=gender))
     pred = pred.rename(columns={"group": "subject_number", "mean_predictions": "predictions"})
-    pred = pred.merge(sd, left_on="index", right_on="filename", how="left")
+    if "research_stage" not in pred.columns:
+        sd = pd.read_csv(
+            SUBJECT_DETAILS_CSV,
+            usecols=["filename", "visit_number"],
+        ).rename(columns={"visit_number": "research_stage"})
+        pred = pred.merge(sd, left_on="index", right_on="filename", how="left")
     pred = pred.dropna(subset=["true_values", "predictions", "subject_number", "research_stage"]).copy()
     pred["_stage_rank"] = pred["research_stage"].map(_stage_rank)
     pred = pred.sort_values(["subject_number", "_stage_rank", "index"]).drop_duplicates(
@@ -134,8 +147,8 @@ def create_biomarker_comparison_plot(
     spec: PlotSpec,
     gender: str,
 ) -> dict:
-    top_values = table.loc[[k for k in top_keys if k in table.index], spec.column_name].dropna()
-    bottom_values = table.loc[[k for k in bottom_keys if k in table.index], spec.column_name].dropna()
+    top_values = table.loc[[k for k in top_keys if k in table.index], spec.column_name].dropna() * spec.scale
+    bottom_values = table.loc[[k for k in bottom_keys if k in table.index], spec.column_name].dropna() * spec.scale
 
     statistic, pvalue = mannwhitneyu(top_values, bottom_values, alternative="two-sided")
     if pvalue < 0.001:
@@ -153,24 +166,27 @@ def create_biomarker_comparison_plot(
     })
 
     sns.set_style("whitegrid")
-    fig, ax = plt.subplots(figsize=(3, 5))
+    fig, ax = plt.subplots(figsize=(60 / 25.4, 80 / 25.4))
     sns.boxplot(
         data=plot_data,
         x="Group",
         y=spec.column_name,
-        palette=["lightgreen", "salmon"],
+        hue="Group",
+        palette={"Bottom 25%": "lightgreen", "Top 25%": "salmon"},
+        legend=False,
         ax=ax,
         width=0.5,
-        medianprops=dict(color="black", linewidth=2.5),
+        medianprops=dict(color="black", linewidth=1.2),
         showfliers=False,
     )
-    sns.swarmplot(
+    sns.stripplot(
         data=plot_data,
         x="Group",
         y=spec.column_name,
         color="black",
-        alpha=0.3,
-        size=2,
+        alpha=0.22,
+        size=0.8,
+        jitter=0.22,
         ax=ax,
     )
 
@@ -180,21 +196,44 @@ def create_biomarker_comparison_plot(
     y_sig = y_max + 0.05 * y_range
     h = 0.02 * y_range
     ax.plot([0, 0, 1, 1], [y_sig, y_sig + h, y_sig + h, y_sig], lw=1.5, c="black")
-    ax.text(0.5, y_sig + h, sig_text, ha="center", va="bottom", fontsize=14, fontweight="bold")
+    ax.text(
+        0.5,
+        y_sig + h,
+        sig_text,
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        fontweight="bold",
+    )
 
-    if spec.threshold is not None:
-        ax.axhline(y=spec.threshold, color="darkblue", linestyle="--", linewidth=1.5, zorder=10)
+    threshold = spec.threshold_for(gender)
+    if threshold is not None:
+        ax.axhline(
+            y=threshold,
+            color="darkblue",
+            linestyle="--",
+            linewidth=1.0,
+            zorder=10,
+        )
 
-    ax.set_ylabel(spec.ylabel, fontsize=12)
+    ax.set_ylabel(spec.ylabel, fontsize=8)
     ax.set_xlabel("")
     ax.set_title("")
-    ax.set_xticklabels([f"Bottom 25%\n(n={len(bottom_values)})", f"Top 25%\n(n={len(top_values)})"])
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(
+        [
+            f"Bottom 25%\n(n={len(bottom_values)})",
+            f"Top 25%\n(n={len(top_values)})",
+        ],
+        fontsize=7,
+    )
+    ax.tick_params(axis="y", labelsize=7)
 
     os.makedirs(OUTDIR, exist_ok=True)
     out_prefix = os.path.join(OUTDIR, f"{spec.output_stub}_{gender}_comparison_boxplot")
     plt.tight_layout()
-    plt.savefig(out_prefix + ".png", dpi=600, bbox_inches="tight")
-    plt.savefig(out_prefix + ".pdf", bbox_inches="tight")
+    plt.savefig(out_prefix + ".png", dpi=600)
+    plt.savefig(out_prefix + ".pdf")
     plt.close(fig)
 
     return {

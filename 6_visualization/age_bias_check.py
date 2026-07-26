@@ -28,7 +28,7 @@ import volcano_visualization as vv
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 REPO      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_BASE  = os.path.join(REPO, "..", "paper_revision_outputs")
+OUT_BASE  = os.path.join(REPO, "..", "analysis_outputs")
 OUT_TAG   = os.environ.get("VOICE_RESID_OUT_TAG", "").strip()
 STEP3_DIR = os.environ.get("VOICE_STEP3_DIR", "step3_voice_age_ridge").strip()
 PRED_PATH = os.path.join(OUT_BASE, "step3_voice_age_ridge", "gender_female",
@@ -38,7 +38,7 @@ MAIN_VOLCANO_CSV = os.path.join(OUT_BASE, "step5_volcano", "voice",
 SUBJECT_DETAILS_CSV = ("/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/"
                        "Oct25_voice_full_length/subject_details_df_Oct25.csv")
 
-MIN_AGE, MAX_AGE = 40, 72
+MIN_AGE, MAX_AGE = 40, 70
 PERCENTILE = 0.25
 ALPHA = 0.1
 

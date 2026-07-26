@@ -1,5 +1,9 @@
-"""
-Worker for distributed voice-conditioned age prediction with HPO.
+"""Legacy fold-alignment sensitivity analysis.
+
+This worker is retained for reproducibility of the earlier comparison only.
+It is not the voice-conditioned analysis reported in the final manuscript.
+Use ``run_voice_conditioned_holdout.py`` for the leakage-free, calibrated,
+intersection-cohort analysis used in Figure 3.
 
 Decodes $JOB_INDEX → (modality, seed) and runs 5-fold nested CV for:
   - baseline:    modality features only
@@ -68,8 +72,8 @@ except OSError:
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DATA_DIR       = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
-VOICE_OOF_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step3_voice_age_ridge_one_per_subject"
-OUTPUT_BASE    = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_voice_conditioned_hpo"
+VOICE_OOF_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step3_voice_age_ridge_one_per_subject"
+OUTPUT_BASE    = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_voice_conditioned_hpo"
 
 # ── Job grid: 8 modalities × 1 seed = 8 jobs (single-seed pilot) ──────────────
 MODALITIES = [
@@ -278,7 +282,7 @@ def load_voice_metrics(seed: int, sex: str) -> dict:
             "n": d["n_samples"]}
 
 
-def run(job_index: int) -> None:
+def run(job_index: int, output_base: str = OUTPUT_BASE) -> None:
     mod_idx  = job_index // len(SEEDS)
     seed_idx = job_index  % len(SEEDS)
     name, feat_csv, model_type = MODALITIES[mod_idx]
@@ -289,7 +293,7 @@ def run(job_index: int) -> None:
     df, feat_cols = load_modality(name, feat_csv)
 
     for sex in ("female", "male"):
-        out_dir = os.path.join(OUTPUT_BASE, name, f"seed_{seed}", f"gender_{sex}")
+        out_dir = os.path.join(output_base, name, f"seed_{seed}", f"gender_{sex}")
         b_path = os.path.join(out_dir, "baseline_metrics.json")
         c_path = os.path.join(out_dir, "conditioned_metrics.json")
         v_path = os.path.join(out_dir, "voice_metrics.json")
@@ -340,5 +344,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-index", type=int,
                         default=int(os.environ.get("JOB_INDEX", 0)))
+    parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
-    run(args.job_index)
+    run(args.job_index, output_base=args.output_dir or OUTPUT_BASE)

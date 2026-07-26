@@ -7,7 +7,7 @@ Pipeline:
   - 10-seed bagging (same seeds as Ridge baseline)
   - Per-gender split
 
-Outputs go to paper_revision_outputs/step4_multimodality_lgbm_hpo/
+Outputs go to analysis_outputs/step4_multimodality_lgbm_hpo/
 
 Usage
 -----
@@ -41,7 +41,7 @@ from lightgbm_regression import run_multi_seed_lightgbm
 # CONFIG
 # ============================================================
 DATA_DIR = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
-OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_multimodality_lgbm_hpo"
+OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_multimodality_lgbm_hpo"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 N_SPLITS = 5
 N_ITER_SEARCH = 30

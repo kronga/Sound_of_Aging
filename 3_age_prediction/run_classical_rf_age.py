@@ -8,8 +8,8 @@ on the held-out test fold.
 
 Outputs
 -------
-  paper_revision_outputs/step4_classical_rf/{feature_set}/gender_{female|male}/
-  paper_revision_outputs/step4_classical_rf/summary_rf_vs_wavlm.csv
+  analysis_outputs/step4_classical_rf/{feature_set}/gender_{female|male}/
+  analysis_outputs/step4_classical_rf/summary_rf_vs_wavlm.csv
 
 Usage
 -----
@@ -45,8 +45,8 @@ FEATURE_PARQUETS: dict[str, Path] = {
     "emobase":     BASE / "features_emobase"     / "all_features.parquet",
 }
 
-OUTPUT_BASE = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_rf"
-WAVLM_RIDGE = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_voice_age_ridge"
+OUTPUT_BASE = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_rf"
+WAVLM_RIDGE = Path(__file__).parents[2] / "analysis_outputs" / "step3_voice_age_ridge"
 
 MIN_AGE, MAX_AGE  = 40, 70
 N_SPLITS          = 5

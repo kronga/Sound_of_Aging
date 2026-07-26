@@ -1,10 +1,11 @@
 """
-Generate Supplementary Figures S1 and S5 for the voice aging manuscript.
+Generate the engineered-feature comparison (Supplementary Figure 3) and
+partition-stability plot (Supplementary Figure 1).
 
-S1: Grouped barplot comparing age prediction performance (R², MAE) across
+S3: Grouped barplot comparing age prediction performance (R², MAE) across
     acoustic feature sets × model type (Ridge and LightGBM) for each sex.
 
-S5: Seed stability dot plot for WavLM Ridge (filtered latest-subject) model.
+S1: Partition-stability dot plot for the final WavLM Ridge model.
 """
 
 import json
@@ -20,7 +21,7 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs"
+BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs"
 OUT_DIR = BASE
 
 SEEDS = ["seed_1", "seed_2", "seed_3", "seed_4", "seed_17",
@@ -171,10 +172,10 @@ def collect_all_data():
 
 
 # ---------------------------------------------------------------------------
-# Figure S1
+# Supplementary Figure 3
 # ---------------------------------------------------------------------------
 
-def plot_s1(data):
+def plot_s3(data):
     feature_order = ["wavlm", "egemaps", "emobase", "praat", "compare2016"]
     model_order = ["Ridge", "LightGBM"]
     model_colors = {"Ridge": "#4682B4", "LightGBM": "#FF7F50"}
@@ -275,14 +276,10 @@ def plot_s1(data):
                 ]
                 ax.legend(handles=handles, fontsize=10, loc="upper right")
 
-    fig.suptitle(
-        "Supplementary Fig. S1 | Comparison of acoustic feature representations for age prediction",
-        fontsize=12, y=1.01,
-    )
     fig.tight_layout()
 
-    out_png = os.path.join(OUT_DIR, "supp_fig_S1_feature_comparison.png")
-    out_pdf = os.path.join(OUT_DIR, "supp_fig_S1_feature_comparison.pdf")
+    out_png = os.path.join(OUT_DIR, "supp_fig_S3_feature_comparison.png")
+    out_pdf = os.path.join(OUT_DIR, "supp_fig_S3_feature_comparison.pdf")
     fig.savefig(out_png, dpi=150, bbox_inches="tight")
     fig.savefig(out_pdf, bbox_inches="tight")
     plt.close(fig)
@@ -293,12 +290,12 @@ def plot_s1(data):
 
 
 # ---------------------------------------------------------------------------
-# Figure S5
+# Supplementary Figure 1
 # ---------------------------------------------------------------------------
 
-def plot_s5(data):
+def plot_s1(data):
     """
-    4-panel seed stability plot for WavLM Ridge.
+    Four-panel partition-stability plot for WavLM Ridge.
     Panels: Female R², Female MAE, Male R², Male MAE
     """
     sex_labels = {"female": "Female", "male": "Male"}
@@ -381,13 +378,13 @@ def plot_s5(data):
             panel_idx += 1
 
     fig.suptitle(
-        "Supplementary Fig. S5 | Stability of Voice Age model across random seeds",
+        "Supplementary Figure 1 | Stability of Voice Age model across data partitions",
         fontsize=11, y=1.02,
     )
     fig.tight_layout()
 
-    out_png = os.path.join(OUT_DIR, "supp_fig_S5_seed_stability.png")
-    out_pdf = os.path.join(OUT_DIR, "supp_fig_S5_seed_stability.pdf")
+    out_png = os.path.join(OUT_DIR, "supp_fig_S1_seed_stability.png")
+    out_pdf = os.path.join(OUT_DIR, "supp_fig_S1_seed_stability.pdf")
     fig.savefig(out_png, dpi=150, bbox_inches="tight")
     fig.savefig(out_pdf, bbox_inches="tight")
     plt.close(fig)
@@ -402,7 +399,7 @@ def plot_s5(data):
 def print_summary_table(summary_rows):
     """Print a formatted table of mean ± std for R² and MAE."""
     print("\n" + "=" * 90)
-    print("SUMMARY TABLE — S1 data (mean ± std across seeds)")
+    print("SUMMARY TABLE — S3 data (mean ± SD across partitions)")
     print("=" * 90)
     # Pivot: row = sex+feature+model, cols = R2, MAE
     from collections import defaultdict
@@ -411,7 +408,7 @@ def print_summary_table(summary_rows):
         key = (row["sex"], row["feature"], row["model"])
         pivot[key][row["metric"]] = (row["mean"], row["std"], row["n_seeds"])
 
-    header = f"{'Sex':<8}{'Feature':<16}{'Model':<12}{'R² (mean±std)':<22}{'MAE (mean±std)':<22}{'Seeds'}"
+    header = f"{'Sex':<8}{'Feature':<16}{'Model':<12}{'R² (mean±SD)':<22}{'MAE (mean±SD)':<22}{'Partitions'}"
     print(header)
     print("-" * 90)
     feat_order_labels = ["WavLM-Large", "eGeMAPS", "emobase", "Praat", "ComParE 2016"]
@@ -447,11 +444,11 @@ if __name__ == "__main__":
     else:
         print("All expected data found.")
 
-    print("\nGenerating Figure S1...")
-    summary_rows = plot_s1(data)
+    print("\nGenerating Supplementary Figure 3...")
+    summary_rows = plot_s3(data)
 
-    print("\nGenerating Figure S5...")
-    plot_s5(data)
+    print("\nGenerating Supplementary Figure 1...")
+    plot_s1(data)
 
     print_summary_table(summary_rows)
     print("\nDone.")

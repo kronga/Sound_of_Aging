@@ -38,7 +38,7 @@ BASE_PREDICTIONS_PATH = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFol
 COMBINED_RISK_FACTORS_PATH = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/combined_risk_factors.csv"
 
 # ---- Output ----
-OUTDIR = f"/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step5_volcano/{MODALITY}/"
+OUTDIR = f"/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step5_volcano/{MODALITY}/"
 RUN_SUFFIX = ""
 
 # ---- Stratification ----
@@ -48,7 +48,7 @@ USE_VISIT_PRIORITY = False
 
 # ---- Age binning ----
 MIN_AGE = 40
-MAX_AGE = 72
+MAX_AGE = 70
 BIN_WIDTH = 2
 PERCENTILE = 0.25
 

@@ -35,8 +35,8 @@ def _voice_template_enriched(gender: str, out_dir: str) -> str:
     return _enrich_voice_predictions(src, os.path.join(out_dir, f"gender_{gender}"))
 
 LGBM_ROOT = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/LGBM_stuff_new"
-VOICE_RIDGE_ROOT = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step3_voice_age_ridge"
-OUTPUT_ROOT = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step5_volcano"
+VOICE_RIDGE_ROOT = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step3_voice_age_ridge"
+OUTPUT_ROOT = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step5_volcano"
 
 BIOLOGICAL_MODALITIES = [
     "blood_test",

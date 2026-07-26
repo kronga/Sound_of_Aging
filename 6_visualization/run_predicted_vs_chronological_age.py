@@ -25,7 +25,7 @@ def tagged_name(name: str) -> str:
     return f"{name}_{OUT_TAG}" if OUT_TAG else name
 
 
-BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs"
+BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs"
 AVERAGED_PRED_BASE = os.path.join(BASE, STEP3_DIR, "gender_{gender}", "predictions_averaged.csv")
 OUT_BASE = BASE
 GENDERS = ["female", "male"]

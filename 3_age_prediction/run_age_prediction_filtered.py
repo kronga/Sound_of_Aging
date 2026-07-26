@@ -21,7 +21,7 @@ from ridge_regression import run_multi_seed_ridge
 WAVLM_FEATURES_CSV = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/WavLM_features_filtered_with_RF.csv"
 SUBJECT_DETAILS_CSV = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_voice_full_length/subject_details_df_Oct25.csv"
 
-OUTPUT_DIR = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step3_voice_age_ridge_filtered"
+OUTPUT_DIR = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step3_voice_age_ridge_filtered"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 
 N_SPLITS = 5

@@ -8,9 +8,9 @@ a single results table plus a paired (no-QC vs QC) comparison CSV.
 
 Outputs
 -------
-  paper_revision_outputs/step_p5_wavlm_probe_qc/probe_results_full_qc.csv
-  paper_revision_outputs/step_p5_wavlm_probe_qc/probe_qc_vs_noqc_comparison.csv
-  paper_revision_outputs/step_p5_wavlm_probe_qc/probe_r2_gender_split_qc.pdf/.png
+  analysis_outputs/step_p5_wavlm_probe_qc/probe_results_full_qc.csv
+  analysis_outputs/step_p5_wavlm_probe_qc/probe_qc_vs_noqc_comparison.csv
+  analysis_outputs/step_p5_wavlm_probe_qc/probe_r2_gender_split_qc.pdf/.png
 """
 from __future__ import annotations
 
@@ -40,9 +40,9 @@ WAVLM_FILTERED_CSV  = BASE / "WavLM_features_filtered_with_RF.csv"
 PRAAT_PARQUET       = BASE / "features_praat"   / "all_features.parquet"
 EGEMAPS_PARQUET     = BASE / "features_egemaps" / "all_features.parquet"
 SUBJECT_DETAILS_CSV = BASE / "subject_details_df_Oct25.csv"
-NOQC_RESULTS_CSV    = Path(__file__).parents[2] / "paper_revision_outputs" / "step_p5_wavlm_probe" / "probe_results_full.csv"
+NOQC_RESULTS_CSV    = Path(__file__).parents[2] / "analysis_outputs" / "step_p5_wavlm_probe" / "probe_results_full.csv"
 
-OUTPUT_DIR = Path(__file__).parents[2] / "paper_revision_outputs" / "step_p5_wavlm_probe_qc"
+OUTPUT_DIR = Path(__file__).parents[2] / "analysis_outputs" / "step_p5_wavlm_probe_qc"
 
 
 def _probe_subset(X_full, df, mask, groups, label):

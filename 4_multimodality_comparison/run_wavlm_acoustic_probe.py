@@ -20,8 +20,8 @@ Features cover the full modern voice-aging landscape:
 
 Outputs
 -------
-  paper_revision_outputs/step_p5_wavlm_probe/probe_results_full.csv
-  paper_revision_outputs/step_p5_wavlm_probe/probe_r2_gender_split.pdf/.png
+  analysis_outputs/step_p5_wavlm_probe/probe_results_full.csv
+  analysis_outputs/step_p5_wavlm_probe/probe_r2_gender_split.pdf/.png
 
 Usage
 -----
@@ -51,7 +51,7 @@ WAVLM_CSV           = BASE / "WavLM_features.csv"
 PRAAT_PARQUET       = BASE / "features_praat"   / "all_features.parquet"
 EGEMAPS_PARQUET     = BASE / "features_egemaps" / "all_features.parquet"
 SUBJECT_DETAILS_CSV = BASE / "subject_details_df_Oct25.csv"
-OUTPUT_DIR = Path(__file__).parents[2] / "paper_revision_outputs" / "step_p5_wavlm_probe"
+OUTPUT_DIR = Path(__file__).parents[2] / "analysis_outputs" / "step_p5_wavlm_probe"
 
 ALPHA_CANDIDATES = [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
 N_SPLITS = 5

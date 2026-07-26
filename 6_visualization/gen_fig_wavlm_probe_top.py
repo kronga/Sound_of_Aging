@@ -2,7 +2,7 @@
 Generate main-text WavLM probe figure (Fig. 3).
 
 Reads QC-passed probe results from:
-  paper_revision_outputs/step_p5_wavlm_probe_qc/probe_results_full_qc.csv
+  analysis_outputs/step_p5_wavlm_probe_qc/probe_results_full_qc.csv
 
 Selects top-2 features per acoustic category (Praat HNR excluded),
 produces a clean horizontal grouped bar chart with female/male bars,
@@ -23,7 +23,7 @@ import pandas as pd
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT      = Path(__file__).parents[2]
-INPUT_CSV = ROOT / "paper_revision_outputs" / "step_p5_wavlm_probe_qc" / "probe_results_full_qc.csv"
+INPUT_CSV = ROOT / "analysis_outputs" / "step_p5_wavlm_probe_qc" / "probe_results_full_qc.csv"
 OUT_DIR   = ROOT / "voice_age_manuscript" / "final_figs"
 
 # ── Category display order and colour palette ─────────────────────────────────
@@ -75,6 +75,9 @@ def plot(df: pd.DataFrame) -> None:
     df = df.copy()
     df["_cat_rank"] = df["category"].map(cat_rank).fillna(99)
     df = df.sort_values(["_cat_rank", "r2_all"], ascending=[True, False]).reset_index(drop=True)
+    df["label"] = df["label"].replace(
+        {"CPP": "Cepstral peak prominence (CPPS)"}
+    )
 
     labels    = df["label"].tolist()
     r2_female = df["r2_female"].tolist()
@@ -92,8 +95,11 @@ def plot(df: pd.DataFrame) -> None:
         "axes.spines.right":False,
     })
 
-    fig_height = max(5.0, n * 0.38 + 1.2)
-    fig, ax = plt.subplots(figsize=(5.5, fig_height))
+    width_mm = 180.0
+    height_mm = min(225.0, max(150.0, n * 10.7 + 18.0))
+    fig, ax = plt.subplots(
+        figsize=(width_mm / 25.4, height_mm / 25.4)
+    )
 
     bar_colors = [CATEGORY_COLORS.get(c, "#aaaaaa") for c in cats]
 
@@ -164,10 +170,11 @@ def plot(df: pd.DataFrame) -> None:
         borderaxespad=0,
     )
 
-    plt.tight_layout()
+    # Keep labels, bars and both legends within a fixed 180-mm journal canvas.
+    fig.subplots_adjust(left=0.31, right=0.75, bottom=0.08, top=0.985)
     for ext in (".pdf", ".png"):
         out = OUT_DIR / f"fig4_wavlm_probe_top{ext}"
-        fig.savefig(out, dpi=300 if ext == ".png" else None, bbox_inches="tight")
+        fig.savefig(out, dpi=300 if ext == ".png" else None)
         print(f"Saved → {out}")
     plt.close(fig)
 

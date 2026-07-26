@@ -1,5 +1,8 @@
-"""
-Distribute voice-conditioned HPO analysis across mcluster02.
+"""Distribute the legacy fold-alignment sensitivity analysis.
+
+This launcher is not used for the final Figure 3 results. Use
+``distribute_voice_conditioned_holdout.py`` for the leakage-free,
+intersection-cohort analysis reported in the manuscript.
 
 80 jobs total: 8 modalities × 10 seeds.
 Each job runs baseline + conditioned CV for one (modality, seed) pair.
@@ -7,7 +10,7 @@ Each job runs baseline + conditioned CV for one (modality, seed) pair.
 Usage
 -----
     python distribute_voice_conditioned_hpo.py                        # submit all 80 jobs
-    python distribute_voice_conditioned_hpo.py --partition himem7.q   # different queue
+    python distribute_voice_conditioned_hpo.py --partition himem7.q,himem8.q   # different queues
     python distribute_voice_conditioned_hpo.py --cpu 8 --mem 16G      # different resources
     python distribute_voice_conditioned_hpo.py --throttle 20          # limit parallel jobs
     python distribute_voice_conditioned_hpo.py --resume <collection_id>
@@ -29,23 +32,22 @@ from elysium import Elysium, ClusterParams
 
 from run_voice_conditioned_hpo_worker import MODALITIES, SEEDS, OUTPUT_BASE, TOTAL_JOBS
 
-WORKER = (
-    "python /home/davidkro/PycharmProjects/DeepVoice/"
-    "voice_age_repo/4_multimodality_comparison/"
-    "run_voice_conditioned_hpo_worker.py --job-index $JOB_INDEX"
-)
+WORKER_PATH = Path(__file__).with_name(
+    "run_voice_conditioned_hpo_worker.py"
+).resolve()
+WORKER_BASE = f'python "{WORKER_PATH}" --job-index $JOB_INDEX'
 ACTIVATE = "source /net/mraid20/export/jasmine/david/anaconda3/bin/activate"
-ELYSIUM_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_voice_conditioned_hpo"
+ELYSIUM_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_voice_conditioned_hpo"
 
 
 # ── Summarise results ──────────────────────────────────────────────────────────
 
-def summarise() -> None:
+def summarise(output_base: str = OUTPUT_BASE) -> None:
     rows = []
     for name, _, _ in MODALITIES:
         for seed in SEEDS:
             for sex in ("female", "male"):
-                out_dir = Path(OUTPUT_BASE) / name / f"seed_{seed}" / f"gender_{sex}"
+                out_dir = Path(output_base) / name / f"seed_{seed}" / f"gender_{sex}"
                 b_path = out_dir / "baseline_metrics.json"
                 c_path = out_dir / "conditioned_metrics.json"
                 v_path = out_dir / "voice_metrics.json"
@@ -92,7 +94,7 @@ def summarise() -> None:
         .sort_values(["sex", "conditioned_R2_mean"], ascending=[True, False])
     )
 
-    out_csv = Path(OUTPUT_BASE) / "voice_conditioned_hpo_summary.csv"
+    out_csv = Path(output_base) / "voice_conditioned_hpo_summary.csv"
     summary.to_csv(out_csv, index=False)
     print(summary.to_string(index=False))
     print(f"\nSaved: {out_csv}")
@@ -105,29 +107,39 @@ def main() -> None:
     parser.add_argument("--resume",    type=str,   default=None)
     parser.add_argument("--summarise", action="store_true")
     parser.add_argument("--host",      type=str,   default="mcluster02")
-    parser.add_argument("--partition", type=str,   default="himem8.q")
+    parser.add_argument("--partition", type=str,   default="himem7.q,himem8.q")
     parser.add_argument("--cpu",       type=int,   default=10)
     parser.add_argument("--mem",       type=str,   default="20G")
     parser.add_argument("--throttle",  type=int,   default=None)
     parser.add_argument("--elysium-dir", type=str, default=None,
                         help="Override elysium remote dir (default: auto-increments)")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Override results output dir (default: OUTPUT_BASE in worker)")
     args = parser.parse_args()
 
+    output_base = args.output_dir or OUTPUT_BASE
+
     if args.summarise:
-        summarise()
+        summarise(output_base)
         return
 
     if args.elysium_dir:
         remote_dir = args.elysium_dir
     else:
-        # Auto-pick next unused elysium directory
-        existing = sorted(Path(ELYSIUM_BASE).glob("elysium*"))
+        elysium_root = args.output_dir or ELYSIUM_BASE
+        existing = sorted(Path(elysium_root).glob("elysium*"))
         next_idx = max((int(p.name.replace("elysium", "")) for p in existing
                         if p.name.replace("elysium", "").isdigit()), default=0) + 1
-        remote_dir = f"{ELYSIUM_BASE}/elysium{next_idx}"
+        remote_dir = f"{elysium_root}/elysium{next_idx}"
 
     cluster_params = ClusterParams(host_name=args.host, remote_dir=remote_dir)
     print(f"Using remote dir: {remote_dir}")
+    if args.output_dir:
+        print(f"Results output dir: {output_base}")
+
+    worker_cmd = WORKER_BASE
+    if args.output_dir:
+        worker_cmd += f" --output-dir {args.output_dir}"
 
     elysium = Elysium(cluster_params)
     elysium.start()
@@ -137,7 +149,7 @@ def main() -> None:
         print(f"Resumed collection: {col.id}")
     else:
         run_kwargs = dict(
-            command=WORKER,
+            command=worker_cmd,
             total_jobs=TOTAL_JOBS,
             cpu=args.cpu,
             mem=args.mem,
@@ -155,7 +167,7 @@ def main() -> None:
     col.wait()
 
     print("\nAll jobs done. Generating summary...")
-    summarise()
+    summarise(output_base)
 
 
 if __name__ == "__main__":

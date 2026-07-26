@@ -41,7 +41,7 @@ PRED_DIR = Path("/net/mraid20/export/genie/LabData/Analyses/AudioLejepa/data/pre
 POLITICIAN_PARQUET = PRED_DIR / "wavlm_large_politician" / "mean_embeddings.parquet"
 POLITICIAN_MANIFEST = PRED_DIR / "mean_manifest_politician.csv"
 
-OUTPUT_DIR = Path("/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/external_politician_wavlm_ridge")
+OUTPUT_DIR = Path("/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/external_politician_wavlm_ridge")
 
 # ─────────────────────────── config ───────────────────────────────────────── #
 

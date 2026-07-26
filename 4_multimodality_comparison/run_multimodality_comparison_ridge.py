@@ -9,7 +9,7 @@ This replaces the LightGBM comparison to give apples-to-apples benchmarking:
   - Same 10-seed bagging
   - Same per-gender split
 
-Outputs go to paper_revision_outputs/step4_multimodality_ridge/
+Outputs go to analysis_outputs/step4_multimodality_ridge/
 """
 
 import json
@@ -27,7 +27,7 @@ from ridge_regression import run_multi_seed_ridge
 # CONFIG
 # ============================================================
 DATA_DIR = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
-OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_multimodality_ridge"
+OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_multimodality_ridge"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 N_SPLITS = 5
 ALPHA_CANDIDATES = [0.001, 0.01, 0.1, 0.2, 0.5, 1.0, 2.0]

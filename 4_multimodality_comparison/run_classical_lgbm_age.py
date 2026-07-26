@@ -45,7 +45,7 @@ FEATURE_PARQUETS: dict[str, Path] = {
     "emobase":     BASE / "features_emobase"     / "all_features.parquet",
 }
 
-OUTPUT_BASE   = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_lgbm"
+OUTPUT_BASE   = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_lgbm"
 DISTRIBUTE_DIR = Path(__file__).parent / "distribute_classical_lgbm"
 
 SEEDS             = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
@@ -150,7 +150,7 @@ def print_summary() -> None:
         rows.append(_load_metrics(out_dir, fs))
 
     # Add WavLM from ridge results (best available comparison)
-    wavlm_base = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_voice_age_ridge"
+    wavlm_base = Path(__file__).parents[2] / "analysis_outputs" / "step3_voice_age_ridge"
     wavlm_row = {"modality": "WavLM-Large (ridge)"}
     for g in ("female", "male"):
         p = wavlm_base / f"gender_{g}" / "averaged_metrics.csv"

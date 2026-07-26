@@ -607,8 +607,11 @@ def get_default_model(model_type):
         "mfcc": ({"n_mfcc": 13, "sr": 16000}, None),  # Default MFCC parameters
         "wav2vec2_hebrew_ft": ("facebook/wav2vec2-large-xlsr-53", "facebook/wav2vec2-large-xlsr-53"),  # Base model for Hebrew fine-tuned model
         "wav2vec2_hebrew_pretrained": ("facebook/wav2vec2-large-xlsr-53", "facebook/wav2vec2-large-xlsr-53"),  # Base model for Hebrew pretrain model
-        "voxceleb": ("os.environ.get("HF_TOKEN", "")", None),  # Auth token for VoxCeleb
-        "voxceleb_finetuned": ({"auth_token": "os.environ.get("HF_TOKEN", "")"}, None),  # Auth token for VoxCeleb finetuned
+        "voxceleb": (os.environ.get("HF_TOKEN", ""), None),
+        "voxceleb_finetuned": (
+            {"auth_token": os.environ.get("HF_TOKEN", "")},
+            None,
+        ),
         "efficientnet": (None, None),  # EfficientNet doesn't need a pretrained model name
         "efficientnet_finetuned": (None, None)  # EfficientNet finetuned doesn't need a pretrained model name
     }

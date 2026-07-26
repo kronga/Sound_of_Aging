@@ -16,7 +16,7 @@ import seaborn as sns
 from pathlib import Path
 
 # ── Output paths ───────────────────────────────────────────────────────────────
-OUT_DIR   = Path("/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step6_visualization")
+OUT_DIR   = Path("/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step6_visualization")
 FINAL_DIR = Path("/home/davidkro/PycharmProjects/DeepVoice/voice_age_manuscript/final_figs")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 FINAL_DIR.mkdir(parents=True, exist_ok=True)

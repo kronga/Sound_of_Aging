@@ -83,6 +83,7 @@ def ridge_groupcv_with_exports(
     regress_out_confounds: bool = False,
     confound_columns: list | None = None,
     confound_alpha: float = 1.0,
+    calibrate_predictions: bool = False,
 ) -> dict:
     """
     Ridge regression with GroupKFold CV and optional scaling.
@@ -141,11 +142,16 @@ def ridge_groupcv_with_exports(
         ``regress_out_confounds=True``).
     confound_alpha : float
         Ridge alpha used for the confounder regression step.
+    calibrate_predictions : bool
+        If True, fit a linear calibration (polyfit deg=1) on in-sample train
+        predictions per fold and apply to val predictions. Calibrated OOF
+        metrics are saved alongside the uncalibrated ones for comparison.
 
     Returns
     -------
     dict
         OOF metrics including Pearson r, R², MAE, RMSE, per-fold R² list.
+        When calibrate_predictions=True, also includes oof_cal_* keys.
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -190,6 +196,7 @@ def ridge_groupcv_with_exports(
                 regress_out_confounds=regress_out_confounds,
                 confound_columns=confound_columns,
                 confound_alpha=confound_alpha,
+                calibrate_predictions=calibrate_predictions,
             )
             metrics_rows.append({"gender": label, **m})
             results_by_gender[label] = m
@@ -279,6 +286,7 @@ def ridge_groupcv_with_exports(
 
     gkf = GroupKFold(n_splits=n_splits)
     oof = pd.Series(index=y.index, dtype=float)
+    oof_cal = pd.Series(index=y.index, dtype=float) if calibrate_predictions else None
     fold_r2, fold_best_alphas = [], []
     fold_metrics_by_gender: dict[str, list] = {"male": [], "female": []}
 
@@ -311,6 +319,15 @@ def ridge_groupcv_with_exports(
         y_pred = pipe_fold.predict(X_va)
         oof.iloc[va_idx] = y_pred
         fold_r2.append(r2_score(y_va, y_pred))
+
+        if calibrate_predictions:
+            y_pred_tr_insample = pipe_fold.predict(X_tr)
+            if np.std(y_pred_tr_insample) > 0:
+                a_cal, b_cal = np.polyfit(y_pred_tr_insample, y_tr.values, deg=1)
+                y_pred_cal = a_cal * y_pred + b_cal
+            else:
+                y_pred_cal = y_pred.copy()
+            oof_cal.iloc[va_idx] = y_pred_cal
 
         if split_gender_post_train:
             g_va = gender_series.iloc[va_idx]
@@ -354,6 +371,8 @@ def ridge_groupcv_with_exports(
         "true_values": y.values,
         "predictions": oof.values,
     })
+    if calibrate_predictions:
+        pred_df["predictions_cal"] = oof_cal.values
     fold_marks = pd.Series(index=y.index, dtype="Int64")
     for fi, (_, va_idx) in enumerate(gkf.split(X, y, groups), start=1):
         fold_marks.iloc[va_idx] = fi
@@ -403,6 +422,15 @@ def ridge_groupcv_with_exports(
         "regress_out_confounds": bool(regress_out_confounds),
         "confound_columns": confound_columns if regress_out_confounds else None,
     }
+    if calibrate_predictions:
+        oof_cal_r2  = r2_score(y, oof_cal)
+        oof_cal_r   = pearsonr(y, oof_cal)[0] if np.std(oof_cal) > 0 else float("nan")
+        oof_cal_mae = mean_absolute_error(y, oof_cal)
+        oof_cal_rmse = _rmse(y, oof_cal)
+        metrics["oof_cal_Pearson_r"] = float(oof_cal_r)
+        metrics["oof_cal_R2"]        = float(oof_cal_r2)
+        metrics["oof_cal_MAE"]       = float(oof_cal_mae)
+        metrics["oof_cal_RMSE"]      = float(oof_cal_rmse)
     with open(os.path.join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
 
@@ -429,7 +457,8 @@ def ridge_groupcv_with_exports(
         with open(os.path.join(output_dir, "shap_error.txt"), "w") as f:
             f.write(str(e))
 
-    print(f"Saved outputs → {output_dir}  (OOF R²={oof_r2:.4f}, r={oof_r:.4f})")
+    cal_suffix = f"  cal R²={oof_cal_r2:.4f}" if calibrate_predictions else ""
+    print(f"Saved outputs → {output_dir}  (OOF R²={oof_r2:.4f}, r={oof_r:.4f}{cal_suffix})")
     return metrics
 
 
@@ -468,8 +497,10 @@ def run_multi_seed_ridge(
     """
     os.makedirs(output_dir, exist_ok=True)
     all_pred_series: list[pd.Series] = []
+    all_pred_cal_series: list[pd.Series] = []
     all_coef_dfs: list[pd.DataFrame] = []
     base_df: pd.DataFrame | None = None
+    do_calibrate = kwargs.get("calibrate_predictions", False)
 
     print(f"Starting multi-seed Ridge run  seeds={list(seeds)}")
     print("=" * 60)
@@ -487,9 +518,11 @@ def run_multi_seed_ridge(
             spdf["index"] = spdf["index"].astype(str)
             spdf = spdf.set_index("index")
             if base_df is None:
-                base_cols = [c for c in spdf.columns if c not in ("predictions", "fold")]
+                base_cols = [c for c in spdf.columns if c not in ("predictions", "predictions_cal", "fold")]
                 base_df = spdf[base_cols].copy()
             all_pred_series.append(spdf["predictions"].rename(f"pred_seed_{seed}"))
+            if do_calibrate and "predictions_cal" in spdf.columns:
+                all_pred_cal_series.append(spdf["predictions_cal"].rename(f"pred_cal_seed_{seed}"))
         coef_path = os.path.join(seed_dir, "coefficients.csv")
         if os.path.exists(coef_path):
             cdf = pd.read_csv(coef_path)
@@ -503,6 +536,9 @@ def run_multi_seed_ridge(
     base_df["mean_predictions"] = preds.mean(axis=1)
     base_df["pred_std"] = preds.std(axis=1)
     final_pred_df = pd.concat([base_df, preds], axis=1)
+    if do_calibrate and all_pred_cal_series:
+        preds_cal = pd.concat(all_pred_cal_series, axis=1)
+        final_pred_df["mean_predictions_cal"] = preds_cal.mean(axis=1)
     final_pred_df.reset_index().to_csv(
         os.path.join(output_dir, "predictions_averaged.csv"), index=False
     )
@@ -520,6 +556,15 @@ def run_multi_seed_ridge(
         "averaged_MAE": float(mean_absolute_error(y_true, y_pred)),
         "averaged_RMSE": float(_rmse(y_true, y_pred)),
     }
+    if do_calibrate and "mean_predictions_cal" in final_pred_df.columns:
+        y_pred_cal = final_pred_df["mean_predictions_cal"]
+        mask_cal = y_true.notna() & y_pred_cal[mask.index].notna()
+        yp_cal = y_pred_cal[mask.index][mask_cal]
+        yt_cal = y_true[mask_cal]
+        metrics["averaged_cal_Pearson_r"] = float(pearsonr(yt_cal, yp_cal)[0]) if np.std(yp_cal) > 0 else float("nan")
+        metrics["averaged_cal_R2"]        = float(r2_score(yt_cal, yp_cal))
+        metrics["averaged_cal_MAE"]       = float(mean_absolute_error(yt_cal, yp_cal))
+        metrics["averaged_cal_RMSE"]      = float(_rmse(yt_cal, yp_cal))
 
     # gender breakdown when split_gender_post_train was used
     if kwargs.get("split_gender_post_train") and "gender" in final_pred_df.columns:
@@ -556,5 +601,6 @@ def run_multi_seed_ridge(
             os.path.join(output_dir, "coefficients_averaged.csv"), index=False
         )
 
-    print(f"Done. Averaged R²={metrics['averaged_R2']:.4f}")
+    cal_str = f"  cal R²={metrics['averaged_cal_R2']:.4f}" if "averaged_cal_R2" in metrics else ""
+    print(f"Done. Averaged R²={metrics['averaged_R2']:.4f}{cal_str}")
     return metrics

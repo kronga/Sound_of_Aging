@@ -7,8 +7,8 @@ on each of the four classical feature sets produced by extract_classical_feature
 
 Outputs
 -------
-  paper_revision_outputs/step4_classical_ridge/{feature_set}/gender_{female|male}/
-  paper_revision_outputs/step4_classical_ridge/summary_classical_vs_wavlm.csv
+  analysis_outputs/step4_classical_ridge/{feature_set}/gender_{female|male}/
+  analysis_outputs/step4_classical_ridge/summary_classical_vs_wavlm.csv
 
 Usage
 -----
@@ -41,8 +41,8 @@ FEATURE_PARQUETS: dict[str, Path] = {
     "emobase":     BASE / "features_emobase"     / "all_features.parquet",
 }
 
-WAVLM_SUMMARY = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_voice_age_ridge"
-OUTPUT_BASE   = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_ridge"
+WAVLM_SUMMARY = Path(__file__).parents[2] / "analysis_outputs" / "step3_voice_age_ridge"
+OUTPUT_BASE   = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_ridge"
 
 SEEDS            = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 N_SPLITS         = 5

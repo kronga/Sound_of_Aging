@@ -29,7 +29,7 @@ BASE = Path("/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/Oct25_vo
 FEATS_CSV = BASE / "audio_features_egemaps_good_quality.csv"
 META_CSV  = BASE / "audio_features_egemaps_metadata_good_quality.csv"
 
-OUTPUT_BASE = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_egemaps_goodquality_ridge"
+OUTPUT_BASE = Path(__file__).parents[2] / "analysis_outputs" / "step4_egemaps_goodquality_ridge"
 
 MIN_AGE, MAX_AGE  = 40, 70
 SEEDS             = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]

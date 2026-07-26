@@ -21,7 +21,7 @@ from lightgbm_regression import run_multi_seed_lightgbm
 # ============================================================
 
 DATA_DIR = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
-OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_multimodality_lgbm"
+OUTPUT_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_multimodality_lgbm"
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
 N_SPLITS = 5
 SPLIT_GENDER = True

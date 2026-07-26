@@ -52,10 +52,10 @@ FEATURE_PARQUETS: dict[str, Path] = {
     "emobase":     BASE / "features_emobase"     / "all_features.parquet",
 }
 
-OUTPUT_BASE  = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_boosting"
-RIDGE_WAVLM  = Path(__file__).parents[2] / "paper_revision_outputs" / "step3_voice_age_ridge"
-RF_CLASS_DIR = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_rf"
-RIDGE_CLASS  = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_classical_ridge"
+OUTPUT_BASE  = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_boosting"
+RIDGE_WAVLM  = Path(__file__).parents[2] / "analysis_outputs" / "step3_voice_age_ridge"
+RF_CLASS_DIR = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_rf"
+RIDGE_CLASS  = Path(__file__).parents[2] / "analysis_outputs" / "step4_classical_ridge"
 
 MIN_AGE, MAX_AGE = 40, 70
 N_SPLITS         = 5

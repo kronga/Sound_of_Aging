@@ -2,13 +2,12 @@
 """
 Lollipop plot of phenome-wide associations using age-residualized ∆VA.
 
-Per-seed pipeline:
-  1. Load per-seed out-of-fold predictions from step3_voice_age_ridge
-  2. Per subject: delta_va = predictions - true_values
-  3. OLS: delta_va ~ true_values (fit per seed)
-  4. Residualize: delta_va_resid = delta_va - (slope * age + intercept)
-  5. Global top/bottom 25% by delta_va_resid within age range
-  6. Compute delta_z (mean_top - mean_bottom) per feature
+Pipeline:
+  1. Load ten-seed-averaged out-of-fold predictions.
+  2. Residualize Voice Age against chronological age within sex.
+  3. Define global top/bottom 25% groups from residualized Delta VA.
+  4. Compute standardized mean differences between groups.
+  5. Estimate 95% percentile intervals by participant-level bootstrap.
 
 Significance flags: load from step5_volcano/voice_residualized/ CSV produced
 by age_bias_check.py (female). For male the significance is computed here inline
@@ -27,20 +26,46 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy import stats
 from scipy.stats import linregress, mannwhitneyu
 from sklearn.preprocessing import StandardScaler
 from statsmodels.stats.multitest import multipletests
 from matplotlib.lines import Line2D
 
+from phenotype_enrichment import add_vat_area
+
 
 def _clean_feature_label(name: str) -> str:
     """Strip parenthetical suffixes like (SM), (BT), (DXA), (DL), (US), (FI).
-    Also fix backslash to forward slash and collapse extra whitespace."""
+    Also fix backslash to forward slash, collapse whitespace, and use compact
+    publication labels."""
     name = name.replace("\\", "/")
     name = re.sub(r"\s*\([^)]+\)\s*$", "", name)
     name = re.sub(r"\s+", " ", name).strip()
-    return name
+    compact_labels = {
+        "Scanned VAT area": "VAT area",
+        "VAT area": "VAT area",
+        "Median daily caloric intake": "Daily energy intake",
+        "Median daily carbohydrate caloric intake": "Daily carbohydrate energy",
+        "Median daily lipid caloric intake": "Daily fat energy",
+        "Median daily protein caloric intake": "Daily protein energy",
+        "Median Daily Sodium": "Daily sodium",
+        "Carotid - intima media thickness": "Carotid IMT",
+        "Android tissue fat percent": "Android tissue fat %",
+        "HbA1C": "HbA1c",
+        "Rem Latency": "REM latency",
+        "SleepEfficiancy": "Sleep efficiency",
+        "Hand Grip Left": "Hand grip left",
+        "Hand Grip Right": "Hand grip right",
+        "Neck Circumference": "Neck circumference",
+        "Mean Oxygen Saturation": "Mean oxygen saturation",
+        "Total Bone Density": "Total bone density",
+        "Total Wake Time": "Total wake time",
+        "Total Sleep Time": "Total sleep time",
+        "Sitting BP diastolic": "Sitting BP diastolic",
+        "Sitting BP systolic": "Sitting BP systolic",
+        "Snore DB": "Snore dB",
+    }
+    return compact_labels.get(name, name)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "5_downstream_analysis"))
 import volcano_visualization as vv
@@ -56,12 +81,12 @@ def tagged_name(name: str) -> str:
 
 SEED_PREDICTIONS_BASE = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
-    f"paper_revision_outputs/{STEP3_DIR}/"
+    f"analysis_outputs/{STEP3_DIR}/"
     "gender_{gender}"
 )
 AVERAGED_PRED_BASE = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
-    f"paper_revision_outputs/{STEP3_DIR}/"
+    f"analysis_outputs/{STEP3_DIR}/"
     "gender_{gender}/predictions_averaged.csv"
 )
 SUBJECT_DETAILS_CSV = (
@@ -70,15 +95,17 @@ SUBJECT_DETAILS_CSV = (
 )
 RESID_VOLCANO_DIR = (
     "/home/davidkro/PycharmProjects/DeepVoice/"
-    f"paper_revision_outputs/step5_volcano/{tagged_name('voice_residualized')}/"
+    f"analysis_outputs/step5_volcano/{tagged_name('voice_residualized')}/"
 )
 OUTDIR = RESID_VOLCANO_DIR
 
 GENDERS = ["male", "female"]
-MIN_AGE, MAX_AGE = 40, 72
+MIN_AGE, MAX_AGE = 40, 70
 PERCENTILE = 0.25
 ALPHA = 0.1
 CI_LEVEL = 0.95
+N_BOOTSTRAPS = 10_000
+BOOTSTRAP_SEED = 20260723
 percent = int(PERCENTILE * 100)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -94,10 +121,13 @@ def _stage_rank(stage: str) -> tuple[int, str]:
 
 
 def load_latest_subject_predictions(pred: pd.DataFrame) -> pd.DataFrame:
-    sd = pd.read_csv(SUBJECT_DETAILS_CSV, usecols=["filename", "visit_number"])
-    sd = sd.rename(columns={"visit_number": "research_stage"})
     df = pred.rename(columns={"group": "subject_number"}).copy()
-    df = df.merge(sd, left_on="index", right_on="filename", how="left")
+    if "research_stage" not in df.columns:
+        sd = pd.read_csv(
+            SUBJECT_DETAILS_CSV,
+            usecols=["filename", "visit_number"],
+        ).rename(columns={"visit_number": "research_stage"})
+        df = df.merge(sd, left_on="index", right_on="filename", how="left")
     df = df.dropna(subset=["true_values", "predictions", "subject_number", "research_stage"]).copy()
     df["_stage_rank"] = df["research_stage"].map(_stage_rank)
     df = df.sort_values(["subject_number", "_stage_rank", "index"]).drop_duplicates(
@@ -109,17 +139,6 @@ def load_latest_subject_predictions(pred: pd.DataFrame) -> pd.DataFrame:
         + df["research_stage"].astype(str)
     )
     return df.reset_index(drop=True)
-
-def load_seed_predictions(gender_dir: str) -> dict[str, pd.DataFrame]:
-    seed_preds = {}
-    for entry in sorted(os.listdir(gender_dir)):
-        if not entry.startswith("seed_"):
-            continue
-        path = os.path.join(gender_dir, entry, "predictions.csv")
-        if os.path.exists(path):
-            seed_preds[entry] = pd.read_csv(path)
-    return seed_preds
-
 
 def residualize_series(age: pd.Series, delta_va: pd.Series) -> tuple[pd.Series, float]:
     """OLS delta_va ~ age. Returns (residuals, r²)."""
@@ -150,25 +169,59 @@ def compute_effect_sizes(bottom_tbl: pd.DataFrame, top_tbl: pd.DataFrame) -> pd.
     return pd.Series(effects)
 
 
-def compute_summary(effects_df: pd.DataFrame) -> pd.DataFrame:
-    n = len(effects_df)
-    t_crit = stats.t.ppf((1 + CI_LEVEL) / 2, df=max(n - 1, 1))
-    mean_e = effects_df.mean()
-    ci = t_crit * effects_df.std() / np.sqrt(n)
-    return pd.DataFrame({"mean": mean_e, "ci": ci})
+def bootstrap_effect_summary(
+    bottom_tbl: pd.DataFrame,
+    top_tbl: pd.DataFrame,
+    seed: int,
+) -> pd.DataFrame:
+    """Participant-level nonparametric bootstrap of top-minus-bottom effects."""
+    common = bottom_tbl.columns.intersection(top_tbl.columns)
+    bottom = bottom_tbl.loc[:, common].to_numpy(dtype=float)
+    top = top_tbl.loc[:, common].to_numpy(dtype=float)
+    point = np.nanmean(top, axis=0) - np.nanmean(bottom, axis=0)
+
+    rng = np.random.default_rng(seed)
+    effects = np.empty((N_BOOTSTRAPS, len(common)), dtype=np.float32)
+    chunk_size = 250
+    for start in range(0, N_BOOTSTRAPS, chunk_size):
+        stop = min(start + chunk_size, N_BOOTSTRAPS)
+        size = stop - start
+        bottom_idx = rng.integers(0, len(bottom), size=(size, len(bottom)))
+        top_idx = rng.integers(0, len(top), size=(size, len(top)))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            effects[start:stop] = (
+                np.nanmean(top[top_idx], axis=1)
+                - np.nanmean(bottom[bottom_idx], axis=1)
+            )
+
+    alpha = (1 - CI_LEVEL) / 2
+    return pd.DataFrame(
+        {
+            "mean": point,
+            "ci_low": np.nanquantile(effects, alpha, axis=0),
+            "ci_high": np.nanquantile(effects, 1 - alpha, axis=0),
+        },
+        index=common,
+    )
 
 
 def run_averaged_significance(gender: str, rf_scaled: pd.DataFrame) -> list[str]:
     """Compute significant features from averaged predictions using OLS residualization."""
-    # Try loading pre-computed results first
+    # Reuse a result table only when it contains exactly the current phenotype
+    # set. This automatically invalidates the legacy VAT-mass/vat-to-fat output
+    # after visit-matched VAT area is introduced.
     resid_csv = os.path.join(RESID_VOLCANO_DIR, f"volcano_age_{gender}_p25__results.csv")
     if os.path.exists(resid_csv):
-        res = pd.read_csv(resid_csv, index_col=0)
-        sig_col = "feature" if "feature" in res.columns else res.index.name
-        if "feature" in res.columns:
+        res = pd.read_csv(resid_csv)
+        if (
+            "feature" in res.columns
+            and set(res["feature"]) == set(rf_scaled.columns)
+        ):
             return res.loc[res["significant"] == True, "feature"].tolist()
-        else:
-            return res.index[res["significant"] == True].tolist()
+        print(
+            f"  Recomputing {gender} significance: phenotype columns changed."
+        )
 
     # Compute from scratch using averaged predictions
     pred = pd.read_csv(AVERAGED_PRED_BASE.format(gender=gender))
@@ -212,11 +265,10 @@ def run_averaged_significance(gender: str, rf_scaled: pd.DataFrame) -> list[str]
     return res.loc[res["significant"], "feature"].tolist()
 
 
-def process_gender(gender: str, rf: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    gender_dir = SEED_PREDICTIONS_BASE.format(gender=gender)
-    seed_preds = load_seed_predictions(gender_dir)
-    print(f"  Found {len(seed_preds)} seeds: {list(seed_preds.keys())}")
-
+def process_gender(
+    gender: str,
+    rf: pd.DataFrame,
+) -> tuple[pd.DataFrame, list[str], tuple[int, int]]:
     gender_val = 1 if gender == "male" else 0
     rf_g = rf[rf["gender"] == gender_val].copy()
     drop_cols = [c for c in vv.NON_FEATURE_COLS if c in rf_g.columns]
@@ -225,50 +277,58 @@ def process_gender(gender: str, rf: pd.DataFrame) -> tuple[pd.DataFrame, list[st
     X_scaled = pd.DataFrame(scaler.fit_transform(X.astype(float)),
                             index=X.index, columns=X.columns)
 
-    all_effects = {}
-    final_counts = None
-    for seed_name, pred in seed_preds.items():
-        df = load_latest_subject_predictions(pred)
-        df["delta_va"] = df["predictions"] - df["true_values"]
-        df["delta_va_resid"], r2 = residualize_series(df["true_values"], df["delta_va"])
-        bottom_ids, top_ids = stratify_by_resid(df)
-        bottom_ids = [i for i in bottom_ids if i in X_scaled.index]
-        top_ids    = [i for i in top_ids if i in X_scaled.index]
+    pred = pd.read_csv(AVERAGED_PRED_BASE.format(gender=gender))
+    pred = pred.rename(columns={"mean_predictions": "predictions"})
+    df = load_latest_subject_predictions(pred)
+    df["delta_va"] = df["predictions"] - df["true_values"]
+    df["delta_va_resid"], age_r2 = residualize_series(
+        df["true_values"], df["delta_va"]
+    )
+    bottom_ids, top_ids = stratify_by_resid(df)
+    bottom_ids = [key for key in bottom_ids if key in X_scaled.index]
+    top_ids = [key for key in top_ids if key in X_scaled.index]
+    if len(bottom_ids) < 10 or len(top_ids) < 10:
+        raise RuntimeError(
+            f"Too few phenotype-matched participants for {gender}: "
+            f"{len(bottom_ids)}/{len(top_ids)}"
+        )
 
-        if len(bottom_ids) < 10 or len(top_ids) < 10:
-            print(f"  Skipping {seed_name}: too few matched ({len(bottom_ids)}/{len(top_ids)})")
-            continue
-
-        all_effects[seed_name] = compute_effect_sizes(
-            X_scaled.loc[bottom_ids], X_scaled.loc[top_ids])
-        final_counts = (len(bottom_ids), len(top_ids))
-        print(f"  {seed_name}: bottom={len(bottom_ids)}, top={len(top_ids)},  r²_age={r2:.3f}")
-
-    if len(all_effects) < 2:
-        raise RuntimeError(f"Not enough seeds for {gender}.")
-
-    effects_df = pd.DataFrame(all_effects).T.dropna(axis=1, how="all")
-    if final_counts is not None:
-        effects_df.attrs["group_counts"] = final_counts
+    summary = bootstrap_effect_summary(
+        X_scaled.loc[bottom_ids],
+        X_scaled.loc[top_ids],
+        BOOTSTRAP_SEED + gender_val,
+    )
+    print(
+        f"  bottom={len(bottom_ids)}, top={len(top_ids)}, "
+        f"residualized age R²={age_r2:.3g}, bootstraps={N_BOOTSTRAPS:,}"
+    )
     sig = run_averaged_significance(gender, X_scaled)
     print(f"  Significant features: {len(sig)}")
-    return effects_df, sig
+    return summary, sig, (len(bottom_ids), len(top_ids))
 
 
 def plot_lollipop_combined(
     summary: dict[str, pd.DataFrame],
     sig_features: dict[str, list[str]],
-    n_seeds: dict[str, int],
     group_counts: dict[str, tuple[int, int]],
 ):
-    FONT = 8
-    FEATURE_FONT = 9
-    TICK_FONT = 9
-    AXIS_LABEL_FONT = 10
-    TITLE_FONT = 10.5
-    Y_EDGE_PAD = 0.30
-    FIG_WIDTH = 7.00
-    plt.rcParams.update({"font.size": FONT})
+    FONT = 7
+    LABEL_FONT = 6
+    TITLE_FONT = 8
+    FIG_WIDTH = 125 / 25.4
+    FIG_HEIGHT = 220 / 25.4
+    plt.rcParams.update(
+        {
+            "font.family": "DejaVu Sans",
+            "font.size": FONT,
+            "axes.labelsize": FONT,
+            "axes.titlesize": TITLE_FONT,
+            "xtick.labelsize": FONT,
+            "ytick.labelsize": LABEL_FONT,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
 
     male_sdf   = summary["male"]
     female_sdf = summary["female"]
@@ -280,14 +340,19 @@ def plot_lollipop_combined(
     display_labels = [_clean_feature_label(f) for f in all_features]
     n_feat = len(all_features)
     y_pos  = np.arange(n_feat)
+    interval_limits = []
+    for gender in ("female", "male"):
+        gender_summary = summary[gender].reindex(all_features)
+        interval_limits.extend(
+            gender_summary[["ci_low", "ci_high"]].to_numpy().ravel().tolist()
+        )
+    finite_limits = np.asarray(interval_limits, dtype=float)
+    finite_limits = finite_limits[np.isfinite(finite_limits)]
+    shared_bound = max(float(np.max(np.abs(finite_limits))) * 1.08, 0.1)
+    shared_xlim = (-shared_bound, shared_bound)
 
-    line_height_inch = FONT / 72 * 1.5
-    fig_height = max(6, n_feat * line_height_inch + 1.5)
     fig, axes = plt.subplots(
-        1, 2,
-        sharey=True,
-        figsize=(FIG_WIDTH, fig_height),
-        gridspec_kw={"wspace": 0.18},
+        1, 2, sharey=True, figsize=(FIG_WIDTH, FIG_HEIGHT)
     )
     sns.set_style("whitegrid")
 
@@ -299,7 +364,12 @@ def plot_lollipop_combined(
         sdf     = summary[gender]
         sig_set = set(sig_features.get(gender, []))
         means = np.array([sdf.loc[f, "mean"] if f in sdf.index else np.nan for f in all_features])
-        cis   = np.array([sdf.loc[f, "ci"]   if f in sdf.index else np.nan for f in all_features])
+        ci_low = np.array(
+            [sdf.loc[f, "ci_low"] if f in sdf.index else np.nan for f in all_features]
+        )
+        ci_high = np.array(
+            [sdf.loc[f, "ci_high"] if f in sdf.index else np.nan for f in all_features]
+        )
         is_sig = np.array([f in sig_set for f in all_features])
         colors = [("#FF5252" if m > 0 else "#4CAF50") if s else "grey"
                   for m, s in zip(means, is_sig)]
@@ -307,7 +377,10 @@ def plot_lollipop_combined(
         sizes  = [18 if s else 8 for s in is_sig]
 
         valid = ~np.isnan(means)
-        ax.errorbar(means[valid], y_pos[valid], xerr=cis[valid],
+        asymmetric_ci = np.vstack(
+            [means[valid] - ci_low[valid], ci_high[valid] - means[valid]]
+        )
+        ax.errorbar(means[valid], y_pos[valid], xerr=asymmetric_ci,
                     fmt="none", ecolor="lightgrey", elinewidth=0.5, capsize=1.5, zorder=3)
         for sig_val in [False, True]:
             mask = is_sig == sig_val
@@ -320,56 +393,49 @@ def plot_lollipop_combined(
                        edgecolors=[edges[i] for i in np.where(mask & valid)[0]],
                        linewidths=0.4, zorder=5)
         ax.axvline(0, color="dimgrey", lw=0.5, ls="--", zorder=2)
-        ax.set_xlabel(r"$\Delta$SD (mean $\pm$ 95% CI)", fontsize=AXIS_LABEL_FONT)
+        ax.set_xlabel(r"$\Delta$SD (95% bootstrap interval)", fontsize=FONT)
         bottom_n, top_n = group_counts.get(gender, ("?", "?"))
         ax.set_title(f"{gender.capitalize()}  (n={bottom_n}/{top_n})",
-                     fontsize=TITLE_FONT, weight="bold")
-        ax.tick_params(axis="both", labelsize=TICK_FONT)
-        ax.set_ylim(-Y_EDGE_PAD, n_feat - 1 + Y_EDGE_PAD)
+                     fontsize=TITLE_FONT, weight="normal")
+        ax.tick_params(axis="both", labelsize=FONT)
+        ax.set_xlim(shared_xlim)
 
     axes[0].set_yticks(y_pos)
-    axes[0].set_yticklabels(display_labels, fontsize=FEATURE_FONT, fontweight="bold")
+    axes[0].set_yticklabels(
+        display_labels, fontsize=LABEL_FONT, fontweight="normal"
+    )
     axes[0].tick_params(axis="y", length=0)
 
-    legend_handles = [
-        Line2D([0],[0], marker='o', color='w', markerfacecolor='#FF5252',
-               markeredgecolor='black', markersize=4, label='Higher in old-predicted (sig.)'),
-        Line2D([0],[0], marker='o', color='w', markerfacecolor='#4CAF50',
-               markeredgecolor='black', markersize=4, label='Lower in old-predicted (sig.)'),
-        Line2D([0],[0], marker='o', color='w', markerfacecolor='grey',
-               markersize=3.5, label='Not significant'),
-    ]
-
-    plt.tight_layout(w_pad=2.0, pad=0.15)
+    fig.subplots_adjust(
+        left=0.27,
+        right=0.985,
+        bottom=0.045,
+        top=0.97,
+        wspace=0.16,
+    )
+    fig.text(
+        0.01,
+        0.995,
+        "a",
+        ha="left",
+        va="top",
+        fontsize=TITLE_FONT,
+        fontweight="bold",
+    )
     os.makedirs(OUTDIR, exist_ok=True)
     out_prefix = os.path.join(OUTDIR, f"lollipop_combined_p{percent}_")
-    plt.savefig(out_prefix + ".png", dpi=300, bbox_inches="tight")
-    plt.savefig(out_prefix + ".pdf", bbox_inches="tight")
+    plt.savefig(out_prefix + ".png", dpi=300)
+    plt.savefig(out_prefix + ".pdf")
+
     plt.close()
-
-    legend_fig = plt.figure(figsize=(2.6, 0.95))
-    legend = legend_fig.legend(
-        handles=legend_handles,
-        fontsize=FONT,
-        frameon=True,
-        loc="center",
-        ncol=1,
-    )
-    legend.get_frame().set_edgecolor("lightgrey")
-    legend.get_frame().set_linewidth(0.8)
-    legend_fig.savefig(out_prefix + "legend.png", dpi=300, bbox_inches="tight")
-    legend_fig.savefig(out_prefix + "legend.pdf", bbox_inches="tight")
-    plt.close(legend_fig)
-
     plt.rcParams.update({"font.size": plt.rcParamsDefault["font.size"]})
     print(f"Saved combined lollipop → {out_prefix}.png/.pdf")
-    print(f"Saved lollipop legend → {out_prefix}legend.png/.pdf")
 
 
 def main():
     os.makedirs(OUTDIR, exist_ok=True)
 
-    rf = pd.read_csv(vv.COMBINED_RISK_FACTORS_PATH)
+    rf = add_vat_area(pd.read_csv(vv.COMBINED_RISK_FACTORS_PATH))
     if "subject_number" not in rf.columns and "subject_id" in rf.columns:
         rf = rf.rename(columns={"subject_id": "subject_number"})
     rf = rf.copy()
@@ -377,18 +443,16 @@ def main():
                 + "_" + rf["research_stage"].astype(str))
     rf = rf[~rf.index.duplicated(keep="first")]
 
-    all_effects, all_sig, group_counts = {}, {}, {}
+    summary, all_sig, group_counts = {}, {}, {}
     for gender in GENDERS:
         print(f"\n{'='*60}\nProcessing: {gender.upper()}\n{'='*60}")
-        effects_df, sig = process_gender(gender, rf)
-        all_effects[gender] = effects_df
-        all_sig[gender]     = sig
-        group_counts[gender] = effects_df.attrs.get("group_counts", ("?", "?"))
+        gender_summary, sig, counts = process_gender(gender, rf)
+        summary[gender] = gender_summary
+        all_sig[gender] = sig
+        group_counts[gender] = counts
 
     print(f"\n{'='*60}\nPlotting combined lollipop\n{'='*60}")
-    summary  = {g: compute_summary(all_effects[g]) for g in GENDERS}
-    n_seeds  = {g: len(all_effects[g]) for g in GENDERS}
-    plot_lollipop_combined(summary, all_sig, n_seeds, group_counts)
+    plot_lollipop_combined(summary, all_sig, group_counts)
     print(f"\n{'='*60}\nDone!\n{'='*60}")
 
 

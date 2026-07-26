@@ -27,7 +27,7 @@ EMOBASE_PARQUET     = BASE / "features_emobase" / "all_features.parquet"
 SUBJECT_DETAILS_CSV = BASE / "subject_details_df_Oct25.csv"
 WAVLM_FILTERED_CSV  = BASE / "WavLM_features_filtered_with_RF.csv"
 
-OUTPUT_BASE = Path(__file__).parents[2] / "paper_revision_outputs" / "step4_emobase_mfcc_ridge"
+OUTPUT_BASE = Path(__file__).parents[2] / "analysis_outputs" / "step4_emobase_mfcc_ridge"
 
 MIN_AGE, MAX_AGE = 40, 70
 SEEDS            = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]

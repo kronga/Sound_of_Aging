@@ -41,8 +41,8 @@ import lightgbm as lgb
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DATA_DIR    = "/net/mraid20/export/genie/LabData/Analyses/DeepVoiceFolder/age_prediction_new_pipeline/data/"
-VOICE_OOF_BASE = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step3_voice_age_ridge_one_per_subject"
-OUTPUT_BASE    = "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/step4_voice_conditioned"
+VOICE_OOF_BASE = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step3_voice_age_ridge_one_per_subject"
+OUTPUT_BASE    = "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/step4_voice_conditioned"
 
 MODALITIES = {
     "sleep":        "X_sleep_age.csv",

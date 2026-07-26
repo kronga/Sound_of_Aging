@@ -22,7 +22,7 @@ WAVLM_FEATURES_CSV = (
     "Oct25_voice_full_length/WavLM_features_filtered_with_RF.csv"
 )
 OUTPUT_DIR = (
-    "/home/davidkro/PycharmProjects/DeepVoice/paper_revision_outputs/"
+    "/home/davidkro/PycharmProjects/DeepVoice/analysis_outputs/"
     "step3_voice_age_ridge_one_per_subject"
 )
 SEEDS = [42, 1, 2, 3, 4, 17, 99, 123, 256, 512]
